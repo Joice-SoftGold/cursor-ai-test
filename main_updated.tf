@@ -210,21 +210,21 @@ resource "helm_release" "kube_prometheus_stack" {
 
   values = [
     yamlencode({
-      grafana = {
-        enabled                  = true
-        defaultDashboardsEnabled = true
-        sidecar = {
-          dashboards = {
-            enabled = true
-            label   = "grafana_dashboard"
-          }
-          datasources = {
-            enabled                  = true
-            defaultDatasourceEnabled = true
-            label                    = "grafana_datasource"
+        grafana = {
+          enabled                  = true
+          defaultDashboardsEnabled = true
+          sidecar = {
+            dashboards = {
+              enabled = true
+              label   = "grafana_dashboard"
+            }
+            datasources = {
+              enabled                  = true
+              defaultDatasourceEnabled = true
+              label                    = "grafana_datasource"
+            }
           }
         }
-      }
       prometheus = {
         prometheusSpec = {
           retention     = "15d"
