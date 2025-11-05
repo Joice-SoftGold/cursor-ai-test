@@ -35,11 +35,11 @@ variable "location" {
 }
 
 locals {
-  resource_group_name = "production-aks-rg"
-  vnet_name           = "aks-vnetnew"
-  subnet_name         = "aks-subnetnew"
-  aks_cluster_name    = "prod-cluster-01"
-  kubernetes_version  = "1.29.4"
+  resource_group_name  = "production-aks-rg"
+  vnet_name            = "aks-vnetnew"
+  subnet_name          = "aks-subnetnew"
+  aks_cluster_name     = "prod-cluster-01"
+  kubernetes_version   = "1.28.9"
   monitoring_namespace = "monitoring"
 }
 
@@ -104,13 +104,12 @@ resource "azurerm_kubernetes_cluster" "aks" {
   }
 
   network_profile {
-    network_plugin     = "azure"
-    network_policy     = "calico"
-    dns_service_ip     = "10.2.0.10"
-    service_cidr       = "10.2.0.0/24"
-    docker_bridge_cidr = "172.17.0.1/16"
-    load_balancer_sku  = "standard"
-    outbound_type      = "loadBalancer"
+    network_plugin    = "azure"
+    network_policy    = "calico"
+    dns_service_ip    = "10.2.0.10"
+    service_cidr      = "10.2.0.0/24"
+    load_balancer_sku = "standard"
+    outbound_type     = "loadBalancer"
   }
 
   linux_profile {
