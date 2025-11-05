@@ -41,6 +41,16 @@ locals {
   aks_cluster_name     = "prod-cluster-01"
   kubernetes_version   = null
   monitoring_namespace = "monitoring"
+
+  nginx_documents = [
+    for doc in split("---", file("${path.module}/k8s/nginx-deployment.yaml")) : trimspace(doc)
+    if trimspace(doc) != ""
+  ]
+
+  nginx_manifests = {
+    for idx, doc in enumerate(local.nginx_documents) :
+    idx => yamldecode(doc)
+  }
 }
 
 resource "azurerm_resource_group" "aks" {
@@ -303,6 +313,17 @@ resource "kubernetes_network_policy" "allow_grafana_to_loki" {
   depends_on = [
     helm_release.kube_prometheus_stack,
     helm_release.loki_stack,
+  ]
+}
+
+resource "kubernetes_manifest" "nginx" {
+  for_each = local.nginx_manifests
+  provider = kubernetes.aks
+
+  manifest = each.value
+
+  depends_on = [
+    azurerm_kubernetes_cluster.aks,
   ]
 }
 
