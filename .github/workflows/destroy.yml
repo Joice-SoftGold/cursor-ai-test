@@ -1,0 +1,34 @@
+name: Destroy AKS Monitoring Stack
+
+on:
+  workflow_dispatch:
+
+jobs:
+  terraform_destroy:
+    runs-on: ubuntu-latest
+    env:
+      AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ env.AZURE_CREDENTIALS }}
+          environment: azurecloud
+
+      - name: Terraform Init
+        run: terraform init -input=false
+
+      - name: Terraform Plan Destroy
+        id: plan
+        run: terraform plan -input=false -no-color -destroy -out=tfplan
+
+      - name: Terraform Apply Destroy Plan
+        if: success() && steps.plan.conclusion == 'success'
+        run: terraform apply -input=false -auto-approve tfplan
