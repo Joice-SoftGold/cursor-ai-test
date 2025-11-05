@@ -220,7 +220,7 @@ resource "helm_release" "kube_prometheus_stack" {
           }
           datasources = {
             enabled                  = true
-            defaultDatasourceEnabled = false
+            defaultDatasourceEnabled = true
             label                    = "grafana_datasource"
           }
         }
