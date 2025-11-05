@@ -44,19 +44,21 @@ locals {
 }
 
 resource "azurerm_resource_group" "aks" {
-  name     = local.resource_group_name
+  name = local.resource_group_name
   location = var.location
 }
 
 resource "azurerm_virtual_network" "aks" {
   name                = local.vnet_name
-  address_space       = ["10.240.0.0/16"]
   location            = azurerm_resource_group.aks.location
   resource_group_name = azurerm_resource_group.aks.name
+
+  address_space = ["10.240.0.0/16"]
 }
 
 resource "azurerm_subnet" "aks" {
-  name                 = local.subnet_name
+  name = local.subnet_name
+
   resource_group_name  = azurerm_resource_group.aks.name
   virtual_network_name = azurerm_virtual_network.aks.name
   address_prefixes     = ["10.240.0.0/20"]
@@ -69,7 +71,7 @@ resource "azurerm_subnet" "aks" {
       actions = [
         "Microsoft.Network/virtualNetworks/subnets/join/action",
         "Microsoft.Network/virtualNetworks/subnets/prepareNetworkPolicies/action",
-        "Microsoft.Network/virtualNetworks/subnets/unprepareNetworkPolicies/action"
+        "Microsoft.Network/virtualNetworks/subnets/unprepareNetworkPolicies/action",
       ]
     }
   }
@@ -102,13 +104,13 @@ resource "azurerm_kubernetes_cluster" "aks" {
   }
 
   network_profile {
-    network_plugin    = "azure"
-    network_policy    = "calico"
-    dns_service_ip    = "10.2.0.10"
-    service_cidr      = "10.2.0.0/24"
+    network_plugin     = "azure"
+    network_policy     = "calico"
+    dns_service_ip     = "10.2.0.10"
+    service_cidr       = "10.2.0.0/24"
     docker_bridge_cidr = "172.17.0.1/16"
-    load_balancer_sku = "standard"
-    outbound_type     = "loadBalancer"
+    load_balancer_sku  = "standard"
+    outbound_type      = "loadBalancer"
   }
 
   linux_profile {
@@ -132,8 +134,7 @@ provider "kubernetes" {
   client_certificate     = base64decode(azurerm_kubernetes_cluster.aks.kube_config[0].client_certificate)
   client_key             = base64decode(azurerm_kubernetes_cluster.aks.kube_config[0].client_key)
   cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.aks.kube_config[0].cluster_ca_certificate)
-
-  load_config_file = false
+  load_config_file       = false
 
   alias = "aks"
 }
@@ -159,9 +160,7 @@ resource "kubernetes_namespace" "monitoring" {
     }
   }
 
-  depends_on = [
-    azurerm_kubernetes_cluster.aks
-  ]
+  depends_on = [azurerm_kubernetes_cluster.aks]
 }
 
 resource "kubernetes_config_map" "grafana_dashboard" {
@@ -171,8 +170,8 @@ resource "kubernetes_config_map" "grafana_dashboard" {
     name      = "pod-resources-dashboard"
     namespace = kubernetes_namespace.monitoring.metadata[0].name
     labels = {
-      "grafana_dashboard"        = "1"
-      "app.kubernetes.io/name"   = "pod-resources"
+      "grafana_dashboard"         = "1"
+      "app.kubernetes.io/name"    = "pod-resources"
       "app.kubernetes.io/part-of" = "observability"
     }
   }
@@ -181,9 +180,7 @@ resource "kubernetes_config_map" "grafana_dashboard" {
     "pod-resources-dashboard.json" = file("${path.module}/dashboards/pod-resources-dashboard.json")
   }
 
-  depends_on = [
-    kubernetes_namespace.monitoring
-  ]
+  depends_on = [kubernetes_namespace.monitoring]
 }
 
 resource "kubernetes_config_map" "grafana_datasource" {
@@ -193,8 +190,8 @@ resource "kubernetes_config_map" "grafana_datasource" {
     name      = "loki-datasource"
     namespace = kubernetes_namespace.monitoring.metadata[0].name
     labels = {
-      "grafana_datasource"       = "1"
-      "app.kubernetes.io/name"   = "loki"
+      "grafana_datasource"        = "1"
+      "app.kubernetes.io/name"    = "loki"
       "app.kubernetes.io/part-of" = "observability"
     }
   }
@@ -213,25 +210,23 @@ resource "kubernetes_config_map" "grafana_datasource" {
     EOT
   }
 
-  depends_on = [
-    kubernetes_namespace.monitoring
-  ]
+  depends_on = [kubernetes_namespace.monitoring]
 }
 
 resource "helm_release" "kube_prometheus_stack" {
   provider = helm.aks
 
-  name       = "kube-prometheus-stack"
+  name = "kube-prometheus-stack"
   repository = "https://prometheus-community.github.io/helm-charts"
-  chart      = "kube-prometheus-stack"
-  version    = "58.5.0"
+  chart = "kube-prometheus-stack"
+  version = "58.5.0"
 
   namespace = kubernetes_namespace.monitoring.metadata[0].name
 
   values = [
     yamlencode({
       grafana = {
-        enabled = true
+        enabled                  = true
         defaultDashboardsEnabled = true
         sidecar = {
           dashboards = {
@@ -239,9 +234,9 @@ resource "helm_release" "kube_prometheus_stack" {
             label   = "grafana_dashboard"
           }
           datasources = {
-            enabled = true
+            enabled                  = true
             defaultDatasourceEnabled = false
-            label                     = "grafana_datasource"
+            label                    = "grafana_datasource"
           }
         }
       }
@@ -251,22 +246,22 @@ resource "helm_release" "kube_prometheus_stack" {
           retentionSize = "50GiB"
         }
       }
-    })
+    }),
   ]
 
   depends_on = [
     kubernetes_config_map.grafana_dashboard,
-    kubernetes_config_map.grafana_datasource
+    kubernetes_config_map.grafana_datasource,
   ]
 }
 
 resource "helm_release" "loki_stack" {
   provider = helm.aks
 
-  name       = "loki"
+  name = "loki"
   repository = "https://grafana.github.io/helm-charts"
-  chart      = "loki-stack"
-  version    = "2.10.2"
+  chart = "loki-stack"
+  version = "2.10.2"
 
   namespace = kubernetes_namespace.monitoring.metadata[0].name
 
@@ -281,12 +276,10 @@ resource "helm_release" "loki_stack" {
       loki = {
         isDefault = true
       }
-    })
+    }),
   ]
 
-  depends_on = [
-    helm_release.kube_prometheus_stack
-  ]
+  depends_on = [helm_release.kube_prometheus_stack]
 }
 
 resource "kubernetes_network_policy" "allow_grafana_to_loki" {
@@ -324,7 +317,7 @@ resource "kubernetes_network_policy" "allow_grafana_to_loki" {
 
   depends_on = [
     helm_release.kube_prometheus_stack,
-    helm_release.loki_stack
+    helm_release.loki_stack,
   ]
 }
 
@@ -336,7 +329,6 @@ output "kube_config" {
     client_key             = azurerm_kubernetes_cluster.aks.kube_config[0].client_key
     cluster_ca_certificate = azurerm_kubernetes_cluster.aks.kube_config[0].cluster_ca_certificate
   }
-
   sensitive = true
 }
 
