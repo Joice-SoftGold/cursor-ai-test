@@ -39,7 +39,7 @@ locals {
   vnet_name            = "aks-vnetnew"
   subnet_name          = "aks-subnetnew"
   aks_cluster_name     = "prod-cluster-01"
-  kubernetes_version   = "1.28.9"
+  kubernetes_version   = null
   monitoring_namespace = "monitoring"
 }
 
