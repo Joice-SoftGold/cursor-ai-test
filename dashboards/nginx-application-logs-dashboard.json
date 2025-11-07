@@ -1,0 +1,72 @@
+{
+  "dashboard": {
+    "title": "Nginx Application Dashboard",
+    "tags": ["nginx", "application", "logs"],
+    "timezone": "browser",
+    "schemaVersion": 16,
+    "panels": [
+      {
+        "id": 1,
+        "title": "Nginx Request Rate",
+        "type": "graph",
+        "datasource": "Loki",
+        "targets": [
+          {
+            "expr": "sum(rate({namespace=\"default\", pod=~\"nginx-from-chatops.*\"}[1m]))",
+            "legendFormat": "Requests/sec",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "HTTP Status Codes",
+        "type": "graph",
+        "datasource": "Loki",
+        "targets": [
+          {
+            "expr": "sum by (status) (count_over_time({namespace=\"default\", pod=~\"nginx.*\"} | regexp `HTTP/[\\d.]+\" (?P<status>\\d{3})` [5m]))",
+            "legendFormat": "{{status}}",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "Recent Nginx Logs",
+        "type": "logs",
+        "datasource": "Loki",
+        "targets": [
+          {
+            "expr": "{namespace=\"default\", pod=~\"nginx-from-chatops.*\"}",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "showTime": true,
+          "wrapLogMessage": true
+        },
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 8}
+      },
+      {
+        "id": 4,
+        "title": "Error Logs",
+        "type": "logs",
+        "datasource": "Loki",
+        "targets": [
+          {
+            "expr": "{namespace=\"default\", pod=~\"nginx.*\"} |~ \"(?i)error|fail|exception\"",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "showTime": true,
+          "wrapLogMessage": true
+        },
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16}
+      }
+    ]
+  }
+}
