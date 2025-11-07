@@ -1,0 +1,112 @@
+# Loki Simple Scalable Mode - Optimized for Small Clusters (4GB nodes)
+# This uses the read/write deployment pattern with minimal resources
+
+deploymentMode: SimpleScalable
+
+loki:
+  auth_enabled: false
+  
+  commonConfig:
+    replication_factor: 1
+  
+  schemaConfig:
+    configs:
+      - from: 2024-01-01
+        store: tsdb
+        object_store: filesystem
+        schema: v13
+        index:
+          prefix: index_
+          period: 24h
+  
+  storage:
+    type: 'filesystem'
+
+  limits_config:
+    max_cache_freshness_per_query: 10m
+    reject_old_samples: true
+    reject_old_samples_max_age: 168h
+    ingestion_rate_mb: 10
+    ingestion_burst_size_mb: 20
+
+# Read component (handles queries)
+read:
+  replicas: 1
+  persistence:
+    enabled: true
+    size: 5Gi
+    storageClass: managed-csi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# Write component (handles log ingestion)
+write:
+  replicas: 1
+  persistence:
+    enabled: true
+    size: 5Gi
+    storageClass: managed-csi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# Backend component (handles compaction, etc.)
+backend:
+  replicas: 1
+  persistence:
+    enabled: true
+    size: 5Gi
+    storageClass: managed-csi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# Gateway
+gateway:
+  enabled: true
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+# Disable single binary mode
+singleBinary:
+  replicas: 0
+
+# Disable caches (memory hungry)
+chunksCache:
+  enabled: false
+resultsCache:
+  enabled: false
+
+# Keep canary for monitoring
+lokiCanary:
+  enabled: true
+  resources:
+    requests:
+      cpu: 10m
+      memory: 16Mi
+    limits:
+      cpu: 50m
+      memory: 32Mi
+
+# Disable test
+test:
+  enabled: false

@@ -1,0 +1,73 @@
+{
+  "dashboard": {
+    "title": "Nginx Application Monitoring",
+    "tags": ["nginx", "application"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "title": "Nginx Pod Status",
+        "type": "table",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "kube_pod_info{pod=~\"nginx-from-chatops.*\"}",
+            "format": "table"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 0}
+      },
+      {
+        "title": "Nginx CPU Usage",
+        "type": "graph",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "sum(rate(container_cpu_usage_seconds_total{pod=~\"nginx-from-chatops.*\"}[5m])) by (pod)",
+            "legendFormat": "{{pod}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+      },
+      {
+        "title": "Nginx Memory Usage",
+        "type": "graph",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "sum(container_memory_working_set_bytes{pod=~\"nginx-from-chatops.*\"}) by (pod)",
+            "legendFormat": "{{pod}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+      },
+      {
+        "title": "Container Restarts",
+        "type": "graph",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "sum(kube_pod_container_status_restarts_total{pod=~\"nginx-from-chatops.*\"}) by (pod)",
+            "legendFormat": "{{pod}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16}
+      },
+      {
+        "title": "Network Traffic",
+        "type": "graph",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "sum(rate(container_network_receive_bytes_total{pod=~\"nginx-from-chatops.*\"}[5m])) by (pod)",
+            "legendFormat": "{{pod}} RX"
+          },
+          {
+            "expr": "sum(rate(container_network_transmit_bytes_total{pod=~\"nginx-from-chatops.*\"}[5m])) by (pod)",
+            "legendFormat": "{{pod}} TX"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16}
+      }
+    ]
+  }
+}

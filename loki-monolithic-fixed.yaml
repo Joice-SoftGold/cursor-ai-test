@@ -1,0 +1,88 @@
+# Loki Monolithic Configuration for Small Clusters
+# This config is optimized for clusters with limited memory (4GB nodes)
+
+# 1. Enable Single Binary Mode (all-in-one)
+singleBinary:
+  replicas: 1
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: managed-csi  # Azure AKS default storage class
+
+# 2. DISABLE all distributed/microservices components
+ingester:
+  replicas: 0
+querier:
+  replicas: 0
+distributor:
+  replicas: 0
+backend:
+  replicas: 0
+read:
+  replicas: 0
+write:
+  replicas: 0
+
+# 3. CRITICAL: Disable cache components (this was missing!)
+chunksCache:
+  enabled: false
+  replicas: 0
+resultsCache:
+  enabled: false
+  replicas: 0
+
+# 4. Disable unnecessary monitoring/testing components
+lokiCanary:
+  enabled: false
+
+# 5. Loki core configuration
+loki:
+  auth_enabled: false
+  
+  commonConfig:
+    replication_factor: 1
+    path_prefix: /var/loki
+  
+  # Schema configuration for TSDB
+  schemaConfig:
+    configs:
+      - from: 2024-01-01
+        store: tsdb
+        object_store: filesystem
+        schema: v13
+        index:
+          prefix: index_
+          period: 24h
+  
+  # Storage configuration
+  storage:
+    type: 'filesystem'
+    bucketNames:
+      chunks: loki-chunks
+      ruler: loki-ruler
+      admin: loki-admin
+    filesystem:
+      chunks_directory: /var/loki/chunks
+      rules_directory: /var/loki/rules
+  
+  # Limits to prevent OOM on small nodes
+  limits_config:
+    max_cache_freshness_per_query: 10m
+    reject_old_samples: true
+    reject_old_samples_max_age: 168h
+    ingestion_rate_mb: 10
+    ingestion_burst_size_mb: 20
+    max_entries_limit_per_query: 5000
+    max_query_length: 721h
+
+# 6. Gateway configuration (optional, but useful for routing)
+gateway:
+  enabled: true
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
