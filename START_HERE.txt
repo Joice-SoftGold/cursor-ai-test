@@ -1,0 +1,220 @@
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║                 🚀 DOCUMIND - AZURE DEPLOYMENT READY 🚀                      ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+📦 WHAT I'VE CREATED FOR YOU:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ HTML FILES (Ready to deploy):
+   • index.html         → Redirects to login page
+   • login.html         → Login page with Admin/User selection
+   • 404.html           → Error page
+
+⚠️  HTML FILES (You need to create):
+   • admin.html         → Copy from "Admin portal v0.2.txt"
+   • user.html          → Copy from "Standard user v0.1.txt"
+
+📖 DOCUMENTATION:
+   • DEPLOY_GUIDE.md    → **⭐ START HERE** - Complete instructions
+   • MANUAL_DEPLOYMENT.md → Detailed deployment steps
+   • QUICKSTART.md      → Quick reference
+   • README.md          → Project overview
+   • SUMMARY.txt        → This summary
+
+🔧 HELPER SCRIPTS:
+   • upload.sh          → Upload files to your server
+   • create_html_files.sh → Create admin/user HTML files
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+🎯 YOUR MISSION (Simple 8 Steps):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  STEP 1️⃣  Create admin.html and user.html
+           
+           Option A: cp "Admin portal v0.2.txt" admin.html
+                     cp "Standard user v0.1.txt" user.html
+           
+           Option B: ./create_html_files.sh
+
+  ─────────────────────────────────────────────────────────────────────────────
+
+  STEP 2️⃣  Fix SSH key permissions (on YOUR machine)
+           
+           chmod 400 ~/path/to/your-azure-key.pem
+
+  ─────────────────────────────────────────────────────────────────────────────
+
+  STEP 3️⃣  Connect to your Azure Ubuntu server
+           
+           ssh -i ~/path/to/your-azure-key.pem azureuser@YOUR_SERVER_IP
+
+  ─────────────────────────────────────────────────────────────────────────────
+
+  STEP 4️⃣  Install Nginx (on the server)
+           
+           sudo apt update
+           sudo apt install nginx -y
+
+  ─────────────────────────────────────────────────────────────────────────────
+
+  STEP 5️⃣  Configure firewall (on the server)
+           
+           sudo ufw allow 22/tcp
+           sudo ufw allow 80/tcp
+           sudo ufw enable
+
+           Also in Azure Portal:
+           VM → Networking → Add inbound port rule → Port 80
+
+  ─────────────────────────────────────────────────────────────────────────────
+
+  STEP 6️⃣  Create web directory (on the server)
+           
+           sudo mkdir -p /var/www/documind
+           sudo chown -R $USER:$USER /var/www/documind
+
+  ─────────────────────────────────────────────────────────────────────────────
+
+  STEP 7️⃣  Configure Nginx (on the server)
+           
+           sudo nano /etc/nginx/sites-available/documind
+           
+           [Paste config from DEPLOY_GUIDE.md]
+           
+           sudo ln -s /etc/nginx/sites-available/documind /etc/nginx/sites-enabled/
+           sudo rm -f /etc/nginx/sites-enabled/default
+           sudo nginx -t
+           sudo systemctl reload nginx
+
+  ─────────────────────────────────────────────────────────────────────────────
+
+  STEP 8️⃣  Upload files (from YOUR machine)
+           
+           ./upload.sh
+           
+           OR manually:
+           
+           scp -i ~/key.pem index.html login.html admin.html user.html \
+               azureuser@YOUR_SERVER_IP:/tmp/
+           
+           Then on server:
+           sudo mv /tmp/*.html /var/www/documind/
+           sudo chown -R www-data:www-data /var/www/documind/
+
+  ═════════════════════════════════════════════════════════════════════════════
+
+  🎉 DONE! Visit: http://YOUR_SERVER_IP
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+✨ HOW IT WORKS (Login Flow):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  1. User visits: http://YOUR_SERVER_IP
+     
+  2. Automatically redirects to: login.html
+     
+  3. User selects login type:
+     • Admin
+     • Standard User
+     
+  4. After successful login:
+     • Admin users    → admin.html (lands on Search & Query page)
+     • Standard users → user.html (lands on Search & Query page)
+
+  ✅ Both roles land on "Search & Query" page by default (as requested)
+  ✅ No code modifications (except login navigation)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+🔍 TROUBLESHOOTING:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ❌ "Permission denied (publickey)"
+     → Run: chmod 400 ~/path/to/your-key.pem
+
+  ❌ Can't access website
+     → Check: Azure Portal → VM → Networking → Port 80 open?
+     → Check: sudo systemctl status nginx
+     → Check: sudo ufw status
+
+  ❌ Styles not loading
+     → Server needs internet access (uses CDN for Tailwind & Lucide)
+
+  ❌ Files not found
+     → Check: ls -la /var/www/documind/
+     → Should show: index.html, login.html, admin.html, user.html
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+📚 DOCUMENTATION:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  🌟 Read First:    DEPLOY_GUIDE.md
+  📖 Detailed:      MANUAL_DEPLOYMENT.md  
+  ⚡ Quick Ref:     QUICKSTART.md
+  📝 Overview:      README.md
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+💡 QUICK COMMANDS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  # Fix key permissions
+  chmod 400 ~/key.pem
+
+  # Connect to server
+  ssh -i ~/key.pem azureuser@SERVER_IP
+
+  # Upload files
+  ./upload.sh
+
+  # Check Nginx
+  sudo systemctl status nginx
+
+  # View logs
+  sudo tail -f /var/log/nginx/access.log
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+✅ CHECKLIST:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  □ Created admin.html from text file
+  □ Created user.html from text file
+  □ Fixed SSH key permissions (chmod 400)
+  □ Connected to Ubuntu server
+  □ Installed Nginx
+  □ Configured Ubuntu firewall (ufw)
+  □ Opened port 80 in Azure NSG
+  □ Created /var/www/documind directory
+  □ Configured Nginx site
+  □ Uploaded all 4 HTML files
+  □ Set proper permissions (www-data)
+  □ Tested in browser
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎊 Once complete, your DocuMind app will be live at:
+
+   http://YOUR_SERVER_IP
+
+🎊 Demo credentials:
+   Email: demo@documind.ai
+   Password: password
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+© 2025 Cyber Base Limited. All rights reserved.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
