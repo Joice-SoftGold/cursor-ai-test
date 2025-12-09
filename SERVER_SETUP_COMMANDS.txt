@@ -1,0 +1,171 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║         🖥️  UBUNTU SERVER SETUP - Copy & Paste These Commands               ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+You're now SSH'd into your Ubuntu server. Run these commands IN ORDER:
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+STEP 1: UPDATE SYSTEM
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+sudo apt update && sudo apt upgrade -y
+
+(This may take a few minutes - press Enter if asked to continue)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+STEP 2: INSTALL NGINX WEB SERVER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+sudo apt install nginx -y
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+STEP 3: START AND ENABLE NGINX
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+sudo systemctl start nginx
+sudo systemctl enable nginx
+sudo systemctl status nginx
+
+(Press 'q' to exit the status screen)
+
+You should see: "active (running)" in green
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+STEP 4: CONFIGURE FIREWALL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+sudo ufw allow 22/tcp
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw --force enable
+sudo ufw status
+
+You should see:
+  22/tcp    ALLOW
+  80/tcp    ALLOW
+  443/tcp   ALLOW
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+STEP 5: CREATE WEBSITE DIRECTORY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+sudo mkdir -p /var/www/documind
+sudo chown -R $USER:$USER /var/www/documind
+sudo chmod -R 755 /var/www/documind
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+STEP 6: CREATE NGINX CONFIGURATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Run this command:
+
+sudo nano /etc/nginx/sites-available/documind
+
+Then copy and paste this ENTIRE block:
+
+─────────────────────────────────────────────────────────────────────────────
+server {
+    listen 80;
+    listen [::]:80;
+    
+    server_name _;
+    
+    root /var/www/documind;
+    index index.html;
+    
+    location / {
+        try_files $uri $uri/ =404;
+    }
+    
+    # Enable gzip compression
+    gzip on;
+    gzip_vary on;
+    gzip_types text/html text/css application/javascript application/json;
+    
+    # Cache static files
+    location ~* \.(jpg|jpeg|png|gif|ico|css|js)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+}
+─────────────────────────────────────────────────────────────────────────────
+
+After pasting:
+  1. Press Ctrl + O (to save)
+  2. Press Enter (to confirm)
+  3. Press Ctrl + X (to exit)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+STEP 7: ENABLE THE SITE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+sudo ln -s /etc/nginx/sites-available/documind /etc/nginx/sites-enabled/
+sudo rm -f /etc/nginx/sites-enabled/default
+sudo nginx -t
+
+You should see:
+  "syntax is ok"
+  "test is successful"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+STEP 8: RESTART NGINX
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+sudo systemctl reload nginx
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+STEP 9: VERIFY EVERYTHING IS WORKING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ls -la /var/www/documind/
+sudo systemctl status nginx
+
+Press 'q' to exit
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ SERVER SETUP COMPLETE!
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Now you need to:
+
+1. Keep this SSH session open (or you can type 'exit' if done for now)
+
+2. Go back to your LOCAL MACHINE terminal
+
+3. Upload the HTML files using the upload.sh script
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+IMPORTANT: AZURE PORTAL STEP
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Don't forget to open Port 80 in Azure Portal:
+
+1. Go to Azure Portal → Your VM
+2. Click "Networking" in left menu
+3. Click "Add inbound port rule"
+4. Set:
+   - Source: Any
+   - Source port ranges: *
+   - Destination: Any
+   - Service: HTTP
+   - Destination port ranges: 80
+   - Protocol: TCP
+   - Action: Allow
+   - Priority: 100
+   - Name: Allow-HTTP
+5. Click "Add"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
