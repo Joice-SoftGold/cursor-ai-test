@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DocuMind - Sign In</title>
+    <!-- Load Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* Specific background for the body to ensure contrast */
+        body {
+            background-color: #FDFDFD;
+        }
+    </style>
+</head>
+<body class="font-sans antialiased text-gray-900 min-h-screen flex items-center justify-center">
+
+    <!-- Login Container -->
+    <div class="bg-white p-10 rounded-2xl shadow-xl w-full max-w-md border border-gray-100">
+        <div class="text-center mb-8">
+            <div class="text-4xl font-extrabold text-gray-900 flex items-center justify-center mb-2">
+                <span class="text-emerald-500 mr-1">Docu</span><span class="font-light text-gray-700">Mind</span>
+            </div>
+            <p class="text-gray-500 text-sm">Enterprise AI Search & Indexing Platform</p>
+        </div>
+        
+        <!-- Login View -->
+        <div id="login-view" class="transition-all duration-300 ease-in-out">
+            <form id="login-form" class="space-y-6">
+                <!-- Login Type Selection (Segmented Control) -->
+                <div class="bg-gray-100 p-1 rounded-xl flex items-center justify-center">
+                    <input type="hidden" id="login-type" name="loginType" value="standard">
+                    <button type="button" id="type-standard" class="w-1/2 py-2 rounded-lg text-sm font-semibold shadow-sm bg-white text-gray-900 transition-all duration-200" onclick="setLoginType('standard')">
+                        Standard User
+                    </button>
+                    <button type="button" id="type-admin" class="w-1/2 py-2 rounded-lg text-sm font-medium text-gray-500 hover:text-gray-700 transition-all duration-200" onclick="setLoginType('admin')">
+                        Admin
+                    </button>
+                </div>
+
+                <div>
+                    <label for="email" class="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i data-lucide="mail" class="h-5 w-5 text-gray-400"></i>
+                        </div>
+                        <input type="email" id="email" class="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-xl focus:ring-emerald-500 focus:border-emerald-500 transition sm:text-sm" placeholder="user@company.com" value="demo@documind.ai" required>
+                    </div>
+                </div>
+
+                <div>
+                    <label for="password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i data-lucide="lock" class="h-5 w-5 text-gray-400"></i>
+                        </div>
+                        <input type="password" id="password" class="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-xl focus:ring-emerald-500 focus:border-emerald-500 transition sm:text-sm" placeholder="••••••••" value="password" required>
+                    </div>
+                    <div class="flex justify-end mt-1">
+                        <button type="button" onclick="toggleView('forgot')" class="text-xs font-medium text-emerald-600 hover:text-emerald-500 focus:outline-none">Forgot password?</button>
+                    </div>
+                </div>
+
+                <button type="submit" id="login-btn" class="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-bold text-white bg-emerald-500 hover:bg-emerald-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition duration-150">
+                    Sign In
+                </button>
+            </form>
+        </div>
+
+        <!-- Forgot Password View (Hidden by default) -->
+        <div id="forgot-password-view" class="hidden transition-all duration-300 ease-in-out">
+            <div class="text-center mb-6">
+                <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-emerald-100 mb-4">
+                    <i data-lucide="key-round" class="h-6 w-6 text-emerald-600"></i>
+                </div>
+                <h3 class="text-xl font-bold text-gray-900">Reset password</h3>
+                <p class="text-sm text-gray-500 mt-2">Enter your email and we'll send you instructions to reset your password.</p>
+            </div>
+
+            <form id="forgot-form" class="space-y-6">
+                <div>
+                    <label for="reset-email" class="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i data-lucide="mail" class="h-5 w-5 text-gray-400"></i>
+                        </div>
+                        <input type="email" id="reset-email" class="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-xl focus:ring-emerald-500 focus:border-emerald-500 transition sm:text-sm" placeholder="user@company.com" required>
+                    </div>
+                </div>
+
+                <button type="submit" id="reset-btn" class="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-bold text-white bg-emerald-500 hover:bg-emerald-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition duration-150">
+                    Send Reset Link
+                </button>
+
+                <div class="text-center">
+                    <button type="button" onclick="toggleView('login')" class="text-sm font-medium text-gray-600 hover:text-gray-900 flex items-center justify-center w-full focus:outline-none">
+                        <i data-lucide="arrow-left" class="w-4 h-4 mr-1"></i> Back to log in
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div class="mt-8 text-center text-xs text-gray-400">
+            &copy; 2025 Cyber Base Limited. All rights reserved.
+        </div>
+    </div>
+
+    <script>
+        // Initialize Icons
+        lucide.createIcons();
+
+        // Handle View Toggling
+        function toggleView(viewName) {
+            const loginView = document.getElementById('login-view');
+            const forgotView = document.getElementById('forgot-password-view');
+            
+            if (viewName === 'forgot') {
+                loginView.classList.add('hidden');
+                forgotView.classList.remove('hidden');
+                // Pre-fill email if available
+                const loginEmail = document.getElementById('email').value;
+                if(loginEmail) document.getElementById('reset-email').value = loginEmail;
+            } else {
+                forgotView.classList.add('hidden');
+                loginView.classList.remove('hidden');
+            }
+            lucide.createIcons(); // Re-init icons for the new view
+        }
+
+        // Handle Login Type Toggle
+        function setLoginType(type) {
+            const standardBtn = document.getElementById('type-standard');
+            const adminBtn = document.getElementById('type-admin');
+            const input = document.getElementById('login-type');
+
+            input.value = type;
+
+            if (type === 'standard') {
+                // Active Styling for Standard
+                standardBtn.classList.add('bg-white', 'text-gray-900', 'shadow-sm', 'font-semibold');
+                standardBtn.classList.remove('text-gray-500', 'font-medium');
+                
+                // Inactive Styling for Admin
+                adminBtn.classList.add('text-gray-500', 'font-medium');
+                adminBtn.classList.remove('bg-white', 'text-gray-900', 'shadow-sm', 'font-semibold');
+            } else {
+                // Active Styling for Admin
+                adminBtn.classList.add('bg-white', 'text-gray-900', 'shadow-sm', 'font-semibold');
+                adminBtn.classList.remove('text-gray-500', 'font-medium');
+
+                // Inactive Styling for Standard
+                standardBtn.classList.add('text-gray-500', 'font-medium');
+                standardBtn.classList.remove('bg-white', 'text-gray-900', 'shadow-sm', 'font-semibold');
+            }
+        }
+
+        // Handle Login Logic - Redirect to appropriate portal based on login type
+        document.getElementById('login-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const btn = document.getElementById('login-btn');
+            const loginType = document.getElementById('login-type').value;
+            
+            // Simulate loading state
+            btn.disabled = true;
+            const originalContent = btn.innerHTML;
+            btn.innerHTML = `<i data-lucide="loader-2" class="animate-spin w-5 h-5 mr-2"></i> Authenticating...`;
+            lucide.createIcons();
+            
+            setTimeout(() => {
+                // Success state
+                btn.innerHTML = `<i data-lucide="check" class="w-5 h-5 mr-2"></i> Success`;
+                lucide.createIcons();
+                btn.classList.remove('bg-emerald-500', 'hover:bg-emerald-600');
+                btn.classList.add('bg-green-600', 'hover:bg-green-700');
+                
+                // Redirect to appropriate portal after brief delay
+                setTimeout(() => {
+                    if (loginType === 'admin') {
+                        window.location.href = 'admin.html';
+                    } else {
+                        window.location.href = 'user.html';
+                    }
+                }, 800);
+            }, 1500);
+        });
+
+        // Handle Forgot Password Logic
+        document.getElementById('forgot-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const btn = document.getElementById('reset-btn');
+            const originalContent = btn.innerHTML;
+            
+            // Simulate loading state
+            btn.disabled = true;
+            btn.innerHTML = `<i data-lucide="loader-2" class="animate-spin w-5 h-5 mr-2"></i> Sending...`;
+            lucide.createIcons();
+            
+            setTimeout(() => {
+                btn.innerHTML = `<i data-lucide="check" class="w-5 h-5 mr-2"></i> Link Sent`;
+                lucide.createIcons();
+                btn.classList.remove('bg-emerald-500', 'hover:bg-emerald-600');
+                btn.classList.add('bg-green-600', 'hover:bg-green-700');
+                
+                // Return to login after success
+                setTimeout(() => {
+                    toggleView('login');
+                    // Reset button state
+                    btn.disabled = false;
+                    btn.innerHTML = originalContent;
+                    btn.classList.add('bg-emerald-500', 'hover:bg-emerald-600');
+                    btn.classList.remove('bg-green-600', 'hover:bg-green-700');
+                }, 1500);
+            }, 1500);
+        });
+    </script>
+</body>
+</html>

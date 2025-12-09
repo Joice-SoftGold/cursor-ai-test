@@ -1,0 +1,127 @@
+================================================================================
+                   DOCUMIND - AZURE DEPLOYMENT SUMMARY
+================================================================================
+
+WHAT I'VE PREPARED FOR YOU:
+---------------------------
+
+✅ index.html          - Redirect page to login
+✅ login.html          - Login with Admin/User toggle + navigation to portals  
+✅ 404.html            - Error page
+
+📄 DEPLOY_GUIDE.md     - **START HERE** - Complete step-by-step guide
+📄 MANUAL_DEPLOYMENT.md - Detailed deployment instructions
+📄 QUICKSTART.md       - Quick reference guide  
+📄 README.md           - Project overview
+
+🔧 upload.sh           - Script to upload files to your server
+🔧 create_html_files.sh - Helper to create admin/user HTML files
+
+================================================================================
+
+WHAT YOU NEED TO DO:
+-------------------
+
+STEP 1: Create the Portal Files
+--------------------------------
+You provided content in these text files:
+  • "Admin portal v0.2.txt"  
+  • "Standard user v0.1.txt"
+
+Create HTML files from them:
+
+  Method A - Copy/rename:
+    cp "Admin portal v0.2.txt" admin.html
+    cp "Standard user v0.1.txt" user.html
+
+  Method B - Use helper script:
+    ./create_html_files.sh
+
+  Method C - Manual:
+    Open each .txt file and "Save As" .html
+
+
+STEP 2: Deploy to Your Azure Ubuntu Server
+------------------------------------------
+
+Quick Commands:
+  
+  1. Fix SSH key permissions:
+     chmod 400 ~/path/to/your-key.pem
+
+  2. Connect to server:
+     ssh -i ~/path/to/your-key.pem azureuser@YOUR_SERVER_IP
+
+  3. Install Nginx (on server):
+     sudo apt update && sudo apt install nginx -y
+
+  4. Configure firewall (on server):
+     sudo ufw allow 80/tcp && sudo ufw enable
+     
+     Also open port 80 in Azure Portal:
+     VM → Networking → Add inbound rule → Port 80
+
+  5. Setup directory (on server):
+     sudo mkdir -p /var/www/documind
+     sudo chown -R $USER:$USER /var/www/documind
+
+  6. Configure Nginx (on server):
+     sudo nano /etc/nginx/sites-available/documind
+     [Copy config from DEPLOY_GUIDE.md]
+     sudo ln -s /etc/nginx/sites-available/documind /etc/nginx/sites-enabled/
+     sudo systemctl reload nginx
+
+  7. Upload files (from your machine):
+     ./upload.sh
+     OR
+     scp -i ~/key.pem *.html azureuser@IP:/tmp/
+     Then: sudo mv /tmp/*.html /var/www/documind/
+
+  8. Visit: http://YOUR_SERVER_IP
+
+
+IMPORTANT NOTES:
+----------------
+
+✅ LOGIN FLOW (AS REQUESTED):
+   • Users select Admin or Standard User on login page
+   • After login, BOTH land on "Search & Query" page by default
+   • Admin portal = admin.html (opens at Search & Query)
+   • User portal = user.html (opens at Search & Query)
+
+✅ NO CODE CHANGES:
+   • I did NOT modify your application code
+   • Only added navigation between pages in login.html
+   • Login redirects to correct portal based on role
+
+✅ FILES READY:
+   • index.html ✓
+   • login.html ✓  
+   • admin.html - YOU CREATE (from your txt file)
+   • user.html - YOU CREATE (from your txt file)
+
+
+NEED HELP?
+----------
+
+📖 Read: DEPLOY_GUIDE.md (most important)
+🚀 Quick: Run ./upload.sh after creating HTML files
+❓ Issues: Check troubleshooting section in DEPLOY_GUIDE.md
+
+
+YOUR NEXT ACTIONS:
+------------------
+
+□ Create admin.html from "Admin portal v0.2.txt"
+□ Create user.html from "Standard user v0.1.txt"  
+□ Run: chmod 400 ~/path/to/your-ssh-key.pem
+□ SSH into your Azure Ubuntu server
+□ Install Nginx
+□ Configure firewall (Ubuntu + Azure)
+□ Upload files using ./upload.sh
+□ Visit http://YOUR_SERVER_IP
+
+================================================================================
+
+Good luck! 🚀
+
