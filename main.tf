@@ -54,10 +54,45 @@ resource "azurerm_storage_blob" "login" {
   source                 = "${path.module}/login.html"
 }
 
+# Upload the admin portal HTML file to the $web container
+resource "azurerm_storage_blob" "admin" {
+  name                   = "admin.html"
+  storage_account_name   = azurerm_storage_account.main.name
+  storage_container_name = "$web"
+  type                   = "Block"
+  content_type           = "text/html"
+  source                 = "${path.module}/admin.html"
+}
+
+# Upload the user portal HTML file to the $web container
+resource "azurerm_storage_blob" "user" {
+  name                   = "user.html"
+  storage_account_name   = azurerm_storage_account.main.name
+  storage_container_name = "$web"
+  type                   = "Block"
+  content_type           = "text/html"
+  source                 = "${path.module}/user.html"
+}
+
 # Outputs
 output "static_website_url" {
   value       = azurerm_storage_account.main.primary_web_endpoint
   description = "The primary web endpoint URL for the static website"
+}
+
+output "login_page_url" {
+  value       = "${azurerm_storage_account.main.primary_web_endpoint}login.html"
+  description = "Direct URL to the login page"
+}
+
+output "admin_page_url" {
+  value       = "${azurerm_storage_account.main.primary_web_endpoint}admin.html"
+  description = "Direct URL to the admin portal"
+}
+
+output "user_page_url" {
+  value       = "${azurerm_storage_account.main.primary_web_endpoint}user.html"
+  description = "Direct URL to the user portal"
 }
 
 output "storage_account_name" {

@@ -10,9 +10,10 @@ This repository contains the infrastructure code to host the DocuMind static web
 
 ## Files
 
-- `login.html` - DocuMind login page (file 1 of 3)
+- `login.html` - DocuMind login page with authentication UI
+- `admin.html` - Admin portal with AI usage tracking, integrations, user management, and audit logs
+- `user.html` - User portal with AI search, query interface, and file organizer
 - `main.tf` - Terraform infrastructure configuration
-- Additional HTML files to be added
 
 ## Prerequisites
 
@@ -50,15 +51,26 @@ terraform apply
 
 Type `yes` when prompted to confirm the deployment.
 
-### Step 5: Get the Website URL
+### Step 5: Get the Website URLs
 
-After deployment completes, Terraform will output the website URL:
+After deployment completes, Terraform will output all the URLs:
 
 ```bash
-terraform output static_website_url
+terraform output
 ```
 
-Your website will be accessible at: `https://stdocumind<random>.z13.web.core.windows.net/login.html`
+You will see:
+- **Login Page**: `https://stdocumind<random>.z13.web.core.windows.net/login.html`
+- **Admin Portal**: `https://stdocumind<random>.z13.web.core.windows.net/admin.html`
+- **User Portal**: `https://stdocumind<random>.z13.web.core.windows.net/user.html`
+
+You can also get individual URLs:
+
+```bash
+terraform output login_page_url
+terraform output admin_page_url
+terraform output user_page_url
+```
 
 ## Manual Upload (Alternative Method)
 
@@ -91,12 +103,15 @@ If you prefer to manually upload files without using Terraform:
 1. In your storage account, go to "Containers"
 2. Click on the "$web" container (automatically created when you enabled static website)
 3. Click "Upload"
-4. Select your HTML files (`login.html`, and the other 2 files)
+4. Select all three HTML files (`login.html`, `admin.html`, `user.html`)
 5. Click "Upload"
 
 ### Step 4: Access Your Website
 
-Navigate to the primary endpoint URL from Step 2. Your website should now be live!
+Navigate to the primary endpoint URL from Step 2 and add the page name:
+- Login: `<primary-endpoint>/login.html`
+- Admin: `<primary-endpoint>/admin.html`
+- User: `<primary-endpoint>/user.html`
 
 ## Cost Estimate
 
@@ -178,10 +193,12 @@ Or manually delete the resource group from Azure Portal.
 
 ## Next Steps
 
-1. **Provide the other 2 HTML files** so I can add them to the deployment
-2. **Run the deployment** using the instructions above
-3. **Test the website** at the provided URL
-4. **Optional**: Set up a custom domain
+1. **Run the deployment** using the instructions above
+2. **Test all three pages** at the provided URLs:
+   - Login page: Entry point for user authentication
+   - Admin portal: Management interface with usage tracking and user management
+   - User portal: Standard user interface with AI search and file organization
+3. **Optional**: Set up a custom domain
 
 ## Support
 
@@ -192,4 +209,4 @@ If you encounter any issues during deployment:
 
 ---
 
-**Current Status**: Ready for deployment once you provide the remaining 2 HTML files.
+**Current Status**: ✅ Ready for deployment! All three HTML files are configured and ready to be hosted on Azure.

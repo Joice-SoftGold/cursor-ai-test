@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DocuMind - User Portal</title>
+    <!-- Load Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #D1D5DB;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #9CA3AF;
+        }
+        .soft-shadow {
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+        }
+        .nav-active {
+            background-color: #F3F4F6;
+            color: #1F2937;
+            font-weight: 600;
+        }
+        .main-content-bg {
+            background: linear-gradient(135deg, #FAFAFA 0%, #FFFFFF 100%);
+        }
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+        .modal-content {
+            background: white;
+            border-radius: 1rem;
+            max-width: 800px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            padding: 2rem;
+        }
+        .hidden {
+            display: none !important;
+        }
+        .file-tree-item {
+            padding: 0.5rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .file-tree-item:hover {
+            background-color: #F3F4F6;
+        }
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background: white;
+            padding: 1rem 1.5rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            z-index: 10000;
+            animation: slideIn 0.3s ease-out;
+        }
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+    </style>
+    <script>
+        // Global app ID
+        const __app_id = 'documind-user-app';
+
+        // Current view state
+        let currentSearchMode = 'nl-query'; // Can be 'nl-query' or 'quick-search'
+
+        // Mock file structure
+        const mockFileStructure = [
+            {
+                id: 1,
+                name: 'Marketing Materials',
+                type: 'folder',
+                children: [
+                    { id: 11, name: 'Q4_Campaign.pdf', type: 'file', size: '2.3 MB' },
+                    { id: 12, name: 'Brand_Guidelines.pdf', type: 'file', size: '5.1 MB' }
+                ]
+            },
+            {
+                id: 2,
+                name: 'Sales Reports',
+                type: 'folder',
+                children: [
+                    { id: 21, name: '2025_Forecast.xlsx', type: 'file', size: '1.2 MB' },
+                    { id: 22, name: 'Q3_Results.xlsx', type: 'file', size: '890 KB' }
+                ]
+            },
+            {
+                id: 3,
+                name: 'Product_Specs.docx',
+                type: 'file',
+                size: '3.4 MB'
+            }
+        ];
+
+        // Mock chat history
+        const mockChatHistory = [
+            {
+                id: 1,
+                title: 'Sales projections for Q4 2025',
+                timestamp: '2 hours ago',
+                preview: 'Based on the current trends, Q4 sales are projected to increase by 15%...'
+            },
+            {
+                id: 2,
+                title: 'Marketing budget allocation',
+                timestamp: '1 day ago',
+                preview: 'The recommended budget distribution focuses on digital channels...'
+            },
+            {
+                id: 3,
+                title: 'Product roadmap analysis',
+                timestamp: '3 days ago',
+                preview: 'Key milestones for the next quarter include feature releases...'
+            }
+        ];
+
+        // Navigate between modules
+        function navigateTo(module) {
+            // Update nav active state
+            document.querySelectorAll('#sidebar nav a').forEach(link => {
+                link.classList.remove('nav-active');
+                link.classList.add('text-gray-500', 'hover:bg-gray-50');
+                link.classList.remove('text-gray-900');
+            });
+            const activeLink = document.getElementById(`nav-${module}`);
+            if (activeLink) {
+                activeLink.classList.add('nav-active');
+                activeLink.classList.remove('text-gray-500', 'hover:bg-gray-50');
+                activeLink.classList.add('text-gray-900');
+            }
+
+            // Render the appropriate module
+            const container = document.getElementById('main-content-container');
+            switch(module) {
+                case 'search':
+                    container.innerHTML = renderSearchModule();
+                    break;
+                case 'history':
+                    container.innerHTML = renderHistoryModule();
+                    break;
+                case 'upload':
+                    container.innerHTML = renderUploadModule();
+                    break;
+                default:
+                    container.innerHTML = renderSearchModule();
+            }
+            lucide.createIcons();
+        }
+
+        // Render AI Search & Query Module
+        function renderSearchModule() {
+            return `
+                <div class="h-full flex flex-col">
+                    <div class="mb-6">
+                        <h1 class="text-3xl font-bold text-gray-900 mb-2">AI Search & Query</h1>
+                        <p class="text-gray-600">Ask questions in natural language or perform quick searches</p>
+                    </div>
+
+                    <!-- Search Mode Toggle -->
+                    <div class="flex gap-2 mb-6">
+                        <button onclick="switchSearchMode('nl-query')" class="px-4 py-2 rounded-lg transition-colors ${currentSearchMode === 'nl-query' ? 'bg-gray-900 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}">
+                            <i data-lucide="message-square" class="w-4 h-4 inline mr-2"></i>
+                            Natural Language
+                        </button>
+                        <button onclick="switchSearchMode('quick-search')" class="px-4 py-2 rounded-lg transition-colors ${currentSearchMode === 'quick-search' ? 'bg-gray-900 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}">
+                            <i data-lucide="search" class="w-4 h-4 inline mr-2"></i>
+                            Quick Search
+                        </button>
+                    </div>
+
+                    <!-- Chat/Search Interface -->
+                    <div class="flex-1 bg-white rounded-xl soft-shadow overflow-hidden flex flex-col">
+                        <!-- Messages Area -->
+                        <div id="chat-messages" class="flex-1 p-6 overflow-y-auto space-y-4">
+                            <div class="flex justify-center">
+                                <div class="bg-gray-50 px-4 py-2 rounded-full text-sm text-gray-600">
+                                    ${currentSearchMode === 'nl-query' ? 'Ask me anything about your documents' : 'Enter keywords to search your documents'}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Input Area -->
+                        <div class="border-t border-gray-200 p-4">
+                            <div class="flex gap-3">
+                                <input 
+                                    id="chat-input" 
+                                    type="text" 
+                                    placeholder="${currentSearchMode === 'nl-query' ? 'Type your question here...' : 'Search keywords...'}" 
+                                    class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900"
+                                    onkeypress="if(event.key === 'Enter') sendMessage()"
+                                >
+                                <button onclick="sendMessage()" class="px-6 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors flex items-center gap-2">
+                                    <i data-lucide="send" class="w-4 h-4"></i>
+                                    Send
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Render History Module
+        function renderHistoryModule() {
+            return `
+                <div class="space-y-6">
+                    <div>
+                        <h1 class="text-3xl font-bold text-gray-900 mb-2">Search History</h1>
+                        <p class="text-gray-600">View and revisit your previous queries and conversations</p>
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-4">
+                        ${mockChatHistory.map(chat => `
+                            <div class="bg-white p-6 rounded-xl soft-shadow hover:shadow-lg transition-shadow cursor-pointer">
+                                <div class="flex items-start justify-between mb-3">
+                                    <h3 class="text-lg font-semibold text-gray-900">${chat.title}</h3>
+                                    <span class="text-sm text-gray-500">${chat.timestamp}</span>
+                                </div>
+                                <p class="text-gray-600 line-clamp-2">${chat.preview}</p>
+                                <div class="mt-4 flex gap-2">
+                                    <button class="text-sm text-gray-700 hover:text-gray-900 flex items-center gap-1">
+                                        <i data-lucide="eye" class="w-4 h-4"></i>
+                                        View
+                                    </button>
+                                    <button class="text-sm text-gray-700 hover:text-gray-900 flex items-center gap-1">
+                                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                        Delete
+                                    </button>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        // Render File Upload & Organizer Module
+        function renderUploadModule() {
+            return `
+                <div class="space-y-6">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h1 class="text-3xl font-bold text-gray-900 mb-2">File Organizer</h1>
+                            <p class="text-gray-600">Upload and organize your documents</p>
+                        </div>
+                        <button onclick="openCreateFolderModal()" class="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors flex items-center gap-2">
+                            <i data-lucide="folder-plus" class="w-4 h-4"></i>
+                            New Folder
+                        </button>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- File Tree -->
+                        <div class="bg-white p-6 rounded-xl soft-shadow">
+                            <h2 class="text-lg font-semibold text-gray-900 mb-4">Your Files</h2>
+                            <div class="space-y-1">
+                                ${renderFileTree(mockFileStructure)}
+                            </div>
+                        </div>
+
+                        <!-- Upload Area -->
+                        <div class="bg-white p-6 rounded-xl soft-shadow">
+                            <h2 class="text-lg font-semibold text-gray-900 mb-4">Upload Files</h2>
+                            <div 
+                                id="drop-zone" 
+                                class="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center hover:border-gray-400 transition-colors cursor-pointer"
+                                onclick="document.getElementById('file-input').click()"
+                                ondrop="handleFileDrop(event)"
+                                ondragover="event.preventDefault()"
+                            >
+                                <i data-lucide="upload-cloud" class="w-16 h-16 text-gray-400 mx-auto mb-4"></i>
+                                <p class="text-lg font-medium text-gray-900 mb-2">Drop files here or click to browse</p>
+                                <p class="text-sm text-gray-600">Support for PDF, DOCX, XLSX, and more</p>
+                                <input type="file" id="file-input" class="hidden" multiple onchange="handleFileSelect(event)">
+                            </div>
+
+                            <div class="mt-6">
+                                <h3 class="text-sm font-semibold text-gray-900 mb-3">Recent Uploads</h3>
+                                <div class="space-y-2">
+                                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                        <div class="flex items-center gap-3">
+                                            <i data-lucide="file-text" class="w-5 h-5 text-gray-600"></i>
+                                            <span class="text-sm text-gray-900">Product_Specs.docx</span>
+                                        </div>
+                                        <span class="text-xs text-gray-500">2 mins ago</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Render file tree recursively
+        function renderFileTree(items, level = 0) {
+            return items.map(item => {
+                if (item.type === 'folder') {
+                    return `
+                        <div class="ml-${level * 4}">
+                            <div class="file-tree-item flex items-center gap-2" onclick="toggleFolder(event, ${item.id})">
+                                <i data-lucide="chevron-right" class="w-4 h-4 text-gray-600 folder-chevron"></i>
+                                <i data-lucide="folder" class="w-5 h-5 text-blue-600"></i>
+                                <span class="text-sm text-gray-900 font-medium">${item.name}</span>
+                                <button onclick="openFolderChat(event, ${item.id}, '${item.name}')" class="ml-auto p-1 hover:bg-gray-200 rounded">
+                                    <i data-lucide="message-square" class="w-4 h-4 text-gray-600"></i>
+                                </button>
+                            </div>
+                            <div class="folder-contents hidden">
+                                ${renderFileTree(item.children, level + 1)}
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    return `
+                        <div class="ml-${(level + 1) * 4} file-tree-item flex items-center gap-2">
+                            <i data-lucide="file" class="w-4 h-4 text-gray-600"></i>
+                            <span class="text-sm text-gray-700">${item.name}</span>
+                            <span class="text-xs text-gray-500 ml-auto">${item.size}</span>
+                        </div>
+                    `;
+                }
+            }).join('');
+        }
+
+        // Toggle folder open/close
+        function toggleFolder(event, folderId) {
+            event.stopPropagation();
+            const folderItem = event.currentTarget;
+            const chevron = folderItem.querySelector('.folder-chevron');
+            const contents = folderItem.nextElementSibling;
+            
+            if (contents.classList.contains('hidden')) {
+                contents.classList.remove('hidden');
+                chevron.style.transform = 'rotate(90deg)';
+            } else {
+                contents.classList.add('hidden');
+                chevron.style.transform = 'rotate(0deg)';
+            }
+        }
+
+        // Open folder-specific chat
+        function openFolderChat(event, folderId, folderName) {
+            event.stopPropagation();
+            document.getElementById('folder-chat-modal').classList.remove('hidden');
+            document.getElementById('folder-chat-modal').setAttribute('data-folder-id', folderId);
+            document.getElementById('folder-chat-modal').setAttribute('data-folder-name', folderName);
+            // Update modal title with folder name
+            const modal = document.getElementById('folder-chat-modal');
+            modal.querySelector('h2').textContent = `Chat with "${folderName}"`;
+        }
+
+        // Close folder chat modal
+        function closeFolderChat() {
+            document.getElementById('folder-chat-modal').classList.add('hidden');
+        }
+
+        // Open create folder modal
+        function openCreateFolderModal() {
+            document.getElementById('create-folder-modal').classList.remove('hidden');
+        }
+
+        // Close create folder modal
+        function closeCreateFolder() {
+            document.getElementById('create-folder-modal').classList.add('hidden');
+        }
+
+        // Create new folder
+        function createFolder() {
+            const folderName = document.getElementById('folder-name-input').value;
+            if (folderName) {
+                showToast('Folder created successfully', 'success');
+                closeCreateFolder();
+                document.getElementById('folder-name-input').value = '';
+                // In a real app, would update the file structure here
+            }
+        }
+
+        // Switch search mode
+        function switchSearchMode(mode) {
+            currentSearchMode = mode;
+            navigateTo('search');
+        }
+
+        // Send message in chat
+        function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const message = input.value.trim();
+            
+            if (message) {
+                const messagesContainer = document.getElementById('chat-messages');
+                
+                // Add user message
+                messagesContainer.innerHTML += `
+                    <div class="flex justify-end">
+                        <div class="bg-gray-900 text-white px-4 py-3 rounded-lg max-w-md">
+                            ${message}
+                        </div>
+                    </div>
+                `;
+                
+                input.value = '';
+                
+                // Simulate AI response
+                setTimeout(() => {
+                    messagesContainer.innerHTML += `
+                        <div class="flex justify-start">
+                            <div class="bg-gray-100 text-gray-900 px-4 py-3 rounded-lg max-w-md">
+                                <p class="mb-2">Based on your documents, here's what I found:</p>
+                                <p class="text-sm">This is a simulated response. In a real implementation, this would be generated by an AI analyzing your documents.</p>
+                            </div>
+                        </div>
+                    `;
+                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                    lucide.createIcons();
+                }, 1000);
+                
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+        }
+
+        // Handle file drop
+        function handleFileDrop(event) {
+            event.preventDefault();
+            const files = event.dataTransfer.files;
+            handleFiles(files);
+        }
+
+        // Handle file select
+        function handleFileSelect(event) {
+            const files = event.target.files;
+            handleFiles(files);
+        }
+
+        // Process uploaded files
+        function handleFiles(files) {
+            for (let i = 0; i < files.length; i++) {
+                showToast(`Uploading ${files[i].name}...`, 'info');
+                // In a real app, would upload the file here
+                setTimeout(() => {
+                    showToast(`${files[i].name} uploaded successfully`, 'success');
+                }, 1500);
+            }
+        }
+
+        // Show toast notification
+        function showToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            
+            const iconMap = {
+                success: 'check-circle',
+                error: 'x-circle',
+                info: 'info'
+            };
+            
+            const colorMap = {
+                success: 'text-green-600',
+                error: 'text-red-600',
+                info: 'text-blue-600'
+            };
+            
+            toast.innerHTML = `
+                <i data-lucide="${iconMap[type]}" class="w-5 h-5 ${colorMap[type]}"></i>
+                <span class="text-gray-900">${message}</span>
+            `;
+            
+            document.body.appendChild(toast);
+            lucide.createIcons();
+            
+            setTimeout(() => {
+                toast.style.animation = 'slideIn 0.3s ease-out reverse';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            navigateTo('search');
+            lucide.createIcons();
+        });
+    </script>
+</head>
+<body class="font-sans antialiased text-gray-900 min-h-screen overflow-x-hidden">
+    <!-- Folder Chat Modal -->
+    <div id="folder-chat-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-900">Chat with Folder</h2>
+                <button onclick="closeFolderChat()" class="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                    <i data-lucide="x" class="w-5 h-5 text-gray-600"></i>
+                </button>
+            </div>
+            
+            <div class="space-y-4 mb-6 max-h-96 overflow-y-auto">
+                <div class="flex justify-center">
+                    <div class="bg-gray-50 px-4 py-2 rounded-full text-sm text-gray-600">
+                        Ask questions specific to this folder's documents
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex gap-3">
+                <input 
+                    type="text" 
+                    placeholder="Ask about these documents..." 
+                    class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900"
+                >
+                <button class="px-6 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors flex items-center gap-2">
+                    <i data-lucide="send" class="w-4 h-4"></i>
+                    Send
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Folder Modal -->
+    <div id="create-folder-modal" class="modal-overlay hidden">
+        <div class="modal-content max-w-md">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-900">Create New Folder</h2>
+                <button onclick="closeCreateFolder()" class="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                    <i data-lucide="x" class="w-5 h-5 text-gray-600"></i>
+                </button>
+            </div>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Folder Name</label>
+                    <input 
+                        id="folder-name-input"
+                        type="text" 
+                        placeholder="Enter folder name" 
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900"
+                    >
+                </div>
+                
+                <div class="flex gap-3">
+                    <button onclick="closeCreateFolder()" class="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
+                        Cancel
+                    </button>
+                    <button onclick="createFolder()" class="flex-1 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors">
+                        Create
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Layout -->
+    <div class="flex h-screen overflow-hidden">
+        <!-- Sidebar -->
+        <div id="sidebar" class="bg-white w-20 p-5 flex flex-col justify-between fixed top-0 left-0 h-full soft-shadow transition-all duration-300 z-50 border-r border-gray-100">
+            <div class="flex flex-col h-full justify-between w-full">
+                <!-- Top Section: Logo and Navigation -->
+                <div class="flex flex-col items-center w-full">
+                    <!-- Logo/Brand -->
+                    <div class="mb-8 p-2 bg-emerald-50 rounded-xl">
+                        <i data-lucide="brain" class="w-6 h-6 text-emerald-600"></i>
+                    </div>
+
+                    <!-- Navigation Links -->
+                    <nav class="space-y-4 w-full flex flex-col items-center">
+                        <a href="#" id="nav-search" onclick="navigateTo('search'); return false;" class="nav-active relative flex items-center justify-center p-3 rounded-xl text-gray-900 transition-all duration-200 group w-12 h-12">
+                            <i data-lucide="search" class="w-5 h-5"></i>
+                            <span class="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">Search</span>
+                        </a>
+                        <a href="#" id="nav-history" onclick="navigateTo('history'); return false;" class="relative flex items-center justify-center p-3 rounded-xl text-gray-500 hover:bg-gray-50 transition-all duration-200 group w-12 h-12">
+                            <i data-lucide="clock" class="w-5 h-5"></i>
+                            <span class="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">History</span>
+                        </a>
+                        <a href="#" id="nav-upload" onclick="navigateTo('upload'); return false;" class="relative flex items-center justify-center p-3 rounded-xl text-gray-500 hover:bg-gray-50 transition-all duration-200 group w-12 h-12">
+                            <i data-lucide="folder" class="w-5 h-5"></i>
+                            <span class="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">Files</span>
+                        </a>
+                    </nav>
+                </div>
+
+                <!-- Bottom Section: User Profile/Logout -->
+                <div class="flex justify-center w-full mb-2">
+                    <div class="relative group cursor-pointer">
+                        <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-semibold">
+                            JD
+                        </div>
+                        <div class="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 px-3 py-2 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+                            <div class="font-medium">John Doe</div>
+                            <div class="text-gray-300 text-xs">john.doe@company.com</div>
+                            <button class="mt-2 text-xs text-red-300 hover:text-red-100">Sign Out</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 ml-20 p-6 md:p-10 overflow-y-auto transition-all duration-300 main-content-bg">
+            <div id="main-content-container" class="h-full">
+                <!-- Content will be dynamically loaded here -->
+            </div>
+        </main>
+    </div>
+</body>
+</html>
