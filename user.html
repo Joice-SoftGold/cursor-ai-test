@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DocuMind - User Portal</title>
+    <!-- Load Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-thumb { background-color: #D1D5DB; border-radius: 4px; }
+        ::-webkit-scrollbar-track { background-color: #F3F4F6; }
+        
+        .nav-active { background-color: #F3F4F6; color: #1F2937; font-weight: 600; }
+        .soft-shadow { box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08); }
+        body { background-color: #FDFDFD; }
+        .main-content-bg { background-color: #F9FAFB; }
+        .user-message { background-color: #E0F2F7; border-radius: 12px 12px 0 12px; }
+        .ai-response { background-color: #FFFFFF; border-radius: 12px 12px 12px 0; border: 1px solid #F3F4F6; }
+        .chat-history-scroll { height: calc(100vh - 180px); /* Increased height by removing header */ }
+        .file-item { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 50px; align-items: center; padding: 12px 16px; border-bottom: 1px solid #F3F4F6; }
+        .file-item:hover { background-color: #FAFAFA; }
+        .file-item.is-folder { cursor: pointer; }
+        .file-item.drag-over { border: 2px dashed #34D399; background-color: #F0FAF5; }
+        .file-children { padding-left: 10px; }
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.5); display: flex; justify-content: center; align-items: center; z-index: 1000; }
+        .modal-content { background: white; border-radius: 1rem; width: 90%; max-width: 600px; height: 80%; max-height: 700px; display: flex; flex-direction: column; }
+        .animate-spin-slow { animation: spin 3s linear infinite; }
+        
+        /* Toast Animation */
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        .toast-enter { animation: slideIn 0.3s ease-out forwards; }
+
+        /* Chart Animations */
+        @keyframes growBar { from { width: 0; } }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+    <script>
+        // Global variables
+        const __app_id = 'documind-user-app';
+        let currentSearchMode = 'nl-query';
+
+        // --- MOCK DATA ---
+        const mockFileStructure = [
+            { 
+                name: "User uploaded files", 
+                type: "folder", 
+                date: "Just now", 
+                status: "Chat Context", 
+                isChatFolder: true,
+                children: [
+                    { name: "Monthly_Sales_Report.pdf", type: "file", date: "Just now", status: "Analyzed" }
+                ]
+            },
+            { name: "Financial Data", type: "folder", date: "Oct 12, 2025", status: "4 files", children: [
+                { name: "Q1_Revenue.xlsx", type: "file", date: "Apr 5, 2025", status: "Indexed" },
+                { name: "Q2_Revenue.xlsx", type: "file", date: "Jul 1, 2025", status: "Indexed" },
+                { name: "Q3_Revenue.xlsx", type: "file", date: "Oct 2, 2025", status: "Indexed" },
+                { name: "Global_Sales_Trends.xlsx", type: "file", date: "Oct 15, 2025", status: "Indexed" },
+            ]},
+            { name: "Project Reports", type: "folder", date: "Sep 28, 2025", status: "15 files", children: [
+                { name: "Market_Expansion_Plan.docx", type: "file", date: "Aug 15, 2025", status: "Indexed" },
+                { name: "Competitor_Analysis.pdf", type: "file", date: "Sep 30, 2025", status: "Processing" },
+                { name: "Customer_Feedback_Survey.csv", type: "file", date: "Sep 10, 2025", status: "Indexed" },
+            ]},
+            { name: "Inventory_Log_2025.xlsx", type: "file", date: "Sep 25, 2025", status: "Indexed" },
+        ];
+
+        // --- HISTORY DATA ---
+        const mockChatHistory = [
+            { id: 1, title: "Summary: Sales Report", date: "Today, 10:30 AM", snippet: "Summarize the key findings from the Monthly Sales Report...", type: "Summary" },
+            { id: 2, title: "Consolidated Q1-Q3 Report", date: "Yesterday, 4:15 PM", snippet: "Generate a new report combining insights from Q1, Q2, and Q3 revenue files...", type: "Report Gen" },
+            { id: 3, title: "Revenue Pie Chart (Jan-Mar)", date: "Oct 24, 2025", snippet: "Create a pie chart showing revenue distribution between Jan 1 and Mar 30...", type: "Chart" },
+            { id: 4, title: "Sales Trend Analysis", date: "Oct 20, 2025", snippet: "Show a line chart of sales trends based on the Excel data...", type: "Trend Analysis" },
+            { id: 5, title: "High Value Inventory", date: "Oct 15, 2025", snippet: "Build a table of inventory items with value > $5000...", type: "Data Table" },
+        ];
+
+        // --- TOAST NOTIFICATION SYSTEM ---
+        function showToast(message, type = 'success') {
+            let container = document.getElementById('toast-notification-container');
+            if (!container) {
+                container = document.createElement('div');
+                container.id = 'toast-notification-container';
+                container.className = 'fixed bottom-5 right-5 z-50 flex flex-col space-y-2';
+                document.body.appendChild(container);
+            }
+            
+            const toast = document.createElement('div');
+            const bgClass = type === 'success' ? 'bg-emerald-600' : 'bg-blue-600';
+            const icon = type === 'success' ? 'check-circle' : 'info';
+            
+            toast.className = `${bgClass} text-white px-4 py-3 rounded-lg shadow-lg flex items-center toast-enter min-w-[300px]`;
+            toast.innerHTML = `<i data-lucide="${icon}" class="w-5 h-5 mr-3"></i><span class="font-medium text-sm">${message}</span>`;
+            
+            container.appendChild(toast);
+            lucide.createIcons();
+            
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(20px)';
+                toast.style.transition = 'all 0.3s ease-out';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        function simulateExport(filename, type) {
+            showToast(`Generating ${type} file: ${filename}...`, 'info');
+            setTimeout(() => {
+                showToast(`Download Complete: ${filename}`);
+            }, 1500);
+        }
+
+        // --- PAGE DEFINITIONS ---
+        function navigateTo(pageId) {
+            const contentContainer = document.getElementById('main-content-container');
+            let htmlContent = '';
+            let title = '';
+            
+            if (pageId === 'search') {
+                htmlContent = generateSearchContent();
+                title = 'AI Search & Query Console';
+            } else if (pageId === 'upload') {
+                htmlContent = generateUploadContent();
+                title = 'Upload & Queue';
+            } else if (pageId === 'history') {
+                htmlContent = generateHistoryContent();
+                title = 'Session History';
+            } else {
+                htmlContent = generateSearchContent();
+                title = 'AI Search & Query Console';
+                pageId = 'search';
+            }
+
+            document.title = 'DocuMind - ' + title;
+            contentContainer.innerHTML = htmlContent;
+            
+            document.querySelectorAll('nav a').forEach(link => {
+                link.classList.remove('nav-active');
+                if (link.id === `nav-${pageId}`) link.classList.add('nav-active');
+            });
+            lucide.createIcons();
+            
+            if (pageId === 'upload') {
+                const newUploadBtn = document.getElementById('new-upload-btn');
+                if (newUploadBtn) newUploadBtn.addEventListener('click', simulateUpload);
+                
+                // FIX: Ensure createFolder is called with null when clicked from header to default to Root
+                const newFolderBtn = document.getElementById('new-folder-btn-header');
+                if (newFolderBtn) newFolderBtn.addEventListener('click', () => createFolder(null));
+                
+                initializeFileTreeLogic(); 
+            } else if (pageId === 'search') {
+                showSearchMode(currentSearchMode);
+            }
+        }
+
+        // --- HISTORY MODULE ---
+        function generateHistoryContent() {
+            // Removed header Logo/User info for vertical space
+            return `
+                <div class="h-full flex flex-col pt-0">
+                    <div class="flex justify-between items-center mb-6 pt-4">
+                        <h2 class="text-xl font-medium text-gray-600">Session History</h2>
+                        <div class="relative">
+                            <input type="text" placeholder="Search history..." class="pl-9 p-2 border border-gray-300 rounded-lg text-sm w-64 focus:ring-emerald-500 focus:border-emerald-500">
+                            <i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3 top-2.5"></i>
+                        </div>
+                    </div>
+                    
+                    <div class="flex-1 bg-white p-6 rounded-2xl soft-shadow border border-gray-100 min-h-0 overflow-y-auto">
+                        <div class="space-y-4">
+                            ${mockChatHistory.map(session => `
+                                <div class="flex items-center justify-between p-4 hover:bg-gray-50 rounded-xl border border-gray-100 transition group cursor-pointer bg-white" onclick="loadHistorySession('${session.title}')">
+                                    <div class="flex items-start space-x-4">
+                                        <div class="p-3 bg-emerald-50 rounded-lg text-emerald-600 group-hover:bg-emerald-100 transition">
+                                            <i data-lucide="message-square" class="w-6 h-6"></i>
+                                        </div>
+                                        <div>
+                                            <h4 class="font-bold text-gray-800">${session.title}</h4>
+                                            <p class="text-sm text-gray-500 line-clamp-1 mt-1">${session.snippet}</p>
+                                            <div class="flex items-center mt-2 space-x-3">
+                                                <span class="text-xs text-gray-400 flex items-center"><i data-lucide="calendar" class="w-3 h-3 mr-1"></i> ${session.date}</span>
+                                                <span class="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full border border-gray-200">${session.type}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center opacity-0 group-hover:opacity-100 transition">
+                                        <button class="p-2 text-gray-400 hover:text-emerald-600 transition" title="Resume Chat"><i data-lucide="arrow-right-circle" class="w-5 h-5"></i></button>
+                                        <button class="p-2 text-gray-400 hover:text-red-600 transition" title="Delete" onclick="event.stopPropagation(); showToast('Mock delete successful', 'info')"><i data-lucide="trash-2" class="w-5 h-5"></i></button>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function loadHistorySession(title) {
+            showToast(`Restoring session: ${title}...`);
+            setTimeout(() => {
+                navigateTo('search');
+            }, 1000);
+        }
+
+        // --- SEARCH MODULE ---
+
+        function generateNaturalLanguageChatInterface() {
+            return `
+            <div class="h-full flex flex-col overflow-hidden relative" id="chat-drop-zone">
+                <div id="chat-drag-overlay" class="absolute inset-0 z-50 hidden bg-emerald-50 bg-opacity-90 border-4 border-dashed border-emerald-400 rounded-xl m-4 flex-col items-center justify-center pointer-events-none">
+                    <i data-lucide="upload-cloud" class="w-16 h-16 text-emerald-600 mb-4"></i>
+                    <p class="text-xl font-bold text-emerald-700">Drop files to add to context</p>
+                </div>
+
+                <div class="flex flex-col flex-1 mx-auto w-full max-w-5xl min-h-0 relative z-10">
+                    <div id="chat-history" class="flex-1 space-y-6 px-4 py-6 main-content-bg overflow-y-auto chat-history-scroll">
+                        <!-- Welcome Message -->
+                        <div class="flex justify-start mx-auto w-full max-w-5xl px-4">
+                            <div class="ai-response max-w-xl p-5 shadow-lg text-gray-700 relative group">
+                                <p class="text-base font-semibold mb-2 flex items-center text-emerald-800">
+                                    <i data-lucide="sparkles" class="w-5 h-5 text-emerald-500 mr-2"></i> DocuMind Agent
+                                </p>
+                                <p class="text-sm leading-relaxed">Hello! Ready to uncover insights? Upload your documents or ask a question to instantly visualize trends, summaries, and reports. Let's get started!</p>
+                                <div class="mt-3 pt-3 border-t border-gray-100 flex items-center text-xs text-gray-400 relative">
+                                    <button onclick="toggleSourcePopup()" class="flex items-center hover:text-emerald-600 transition-colors focus:outline-none">
+                                        <i data-lucide="database" class="w-3 h-3 mr-1"></i> Connected Sources
+                                    </button>
+                                    <div id="source-popup" class="hidden absolute top-full left-0 mt-2 w-64 bg-white p-4 rounded-xl shadow-xl border border-gray-100 z-50">
+                                        <h4 class="font-semibold text-gray-800 mb-2 border-b border-gray-50 pb-2">Active Data Sources</h4>
+                                        <ul class="space-y-2">
+                                            <li class="flex items-center text-gray-600"><div class="p-1 bg-blue-50 rounded mr-2"><i data-lucide="server" class="w-3 h-3 text-blue-500"></i></div> Corporate Data Lake</li>
+                                            <li class="flex items-center text-gray-600"><div class="p-1 bg-yellow-50 rounded mr-2"><i data-lucide="folder" class="w-3 h-3 text-yellow-500"></i></div> Uploaded Files (User)</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Input Area -->
+                    <div class="p-4 bg-white border-t border-gray-200 soft-shadow mt-auto z-20">
+                        <div class="max-w-4xl mx-auto relative flex items-end">
+                            <button onclick="document.getElementById('hidden-chat-file-input').click()" class="mb-3 mr-2 p-2 text-gray-400 hover:text-emerald-600 hover:bg-gray-100 rounded-lg transition" title="Attach File">
+                                <i data-lucide="paperclip" class="w-5 h-5"></i>
+                            </button>
+                            <input type="file" id="hidden-chat-file-input" class="hidden" multiple onchange="handleChatFileUpload(this.files)">
+                            <textarea id="nl-query-box" placeholder="Ask about summaries, charts, or reports..." class="w-full p-3 pr-16 border border-gray-300 rounded-xl focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 resize-none h-20 shadow-sm text-sm" onkeydown="if(event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); submitNLQuery(); }"></textarea>
+                            <button onclick="submitNLQuery()" class="absolute right-3 top-3 py-2 px-3 bg-emerald-500 text-white font-semibold rounded-lg hover:bg-emerald-600 transition duration-150 shadow-md">
+                                <i data-lucide="send" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        }
+        
+        function toggleSourcePopup() {
+            const popup = document.getElementById('source-popup');
+            if (popup) {
+                popup.classList.toggle('hidden');
+            }
+        }
+        
+        function setupChatDragAndDrop() {
+            const dropZone = document.getElementById('chat-drop-zone');
+            const overlay = document.getElementById('chat-drag-overlay');
+            if (!dropZone || !overlay) return;
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => { dropZone.addEventListener(eventName, e => {e.preventDefault(); e.stopPropagation()}, false); document.body.addEventListener(eventName, e => {e.preventDefault(); e.stopPropagation()}, false); });
+            ['dragenter', 'dragover'].forEach(eventName => dropZone.addEventListener(eventName, () => { overlay.classList.remove('hidden'); overlay.classList.add('flex'); }, false));
+            ['dragleave', 'drop'].forEach(eventName => dropZone.addEventListener(eventName, () => { overlay.classList.add('hidden'); overlay.classList.remove('flex'); }, false));
+            dropZone.addEventListener('drop', e => handleChatFileUpload(e.dataTransfer.files), false);
+        }
+        
+        function handleChatFileUpload(files) {
+            if (!files || files.length === 0) return;
+            const chatHistory = document.getElementById('chat-history');
+            if (!chatHistory) return;
+            Array.from(files).forEach(file => {
+                const uploadId = 'upload-' + Math.random().toString(36).substr(2, 9);
+                chatHistory.innerHTML += `<div id="${uploadId}" class="flex justify-end mb-4 mx-auto w-full max-w-5xl px-4"><div class="bg-white border border-gray-200 rounded-lg p-3 shadow-sm flex items-center min-w-[200px]"><div class="mr-3"><i data-lucide="file" class="w-8 h-8 text-emerald-500"></i></div><div class="flex-1"><p class="text-sm font-medium text-gray-800 truncate max-w-[150px]">${file.name}</p><p class="text-xs text-gray-500">Uploading...</p><div class="w-full bg-gray-100 rounded-full h-1.5 mt-1"><div class="bg-emerald-500 h-1.5 rounded-full animate-pulse" style="width: 60%"></div></div></div></div></div>`;
+                chatHistory.scrollTop = chatHistory.scrollHeight;
+                lucide.createIcons();
+                setTimeout(() => {
+                    const el = document.getElementById(uploadId);
+                    if (el) {
+                        el.innerHTML = `<div class="bg-emerald-50 border border-emerald-100 rounded-lg p-3 shadow-sm flex items-center min-w-[200px]"><div class="mr-3 bg-emerald-100 p-2 rounded-full"><i data-lucide="check" class="w-4 h-4 text-emerald-600"></i></div><div><p class="text-sm font-medium text-emerald-900">Uploaded to Context</p><p class="text-xs text-emerald-600 truncate max-w-[150px]">${file.name}</p></div></div>`;
+                        lucide.createIcons();
+                    }
+                }, 1500);
+            });
+        }
+
+        // --- NEW CHAT POPULATION LOGIC (Renders all 5 scenarios) ---
+        function renderMockConversation(container) {
+            // 1. Summary
+            container.innerHTML += getUserMsgHtml("Summarize the key findings from the uploaded Monthly Sales Report.");
+            container.innerHTML += getAiMsgHtml(generateFileSummary());
+
+            // 2. Report
+            container.innerHTML += getUserMsgHtml("Generate a new report combining insights from the 3 uploaded revenue files.");
+            container.innerHTML += getAiMsgHtml(generateConsolidatedReport());
+
+            // 3. Pie Chart
+            container.innerHTML += getUserMsgHtml("Create a pie chart showing revenue distribution between Jan 1 and Mar 30.");
+            container.innerHTML += getAiMsgHtml(generateDateRangePieChart());
+
+            // 4. Line Chart
+            container.innerHTML += getUserMsgHtml("Show a line chart of sales trends based on the Excel data.");
+            container.innerHTML += getAiMsgHtml(generateTrendLineChart());
+
+            // 5. Table
+            container.innerHTML += getUserMsgHtml("Build a table of inventory items with value > $5000.");
+            container.innerHTML += getAiMsgHtml(generateRangeTable());
+            
+            // Scroll to bottom
+            setTimeout(() => { container.scrollTop = container.scrollHeight; }, 100);
+        }
+
+        function getUserMsgHtml(text) {
+            return `<div class="flex justify-end mb-6 mx-auto w-full max-w-5xl px-4"><div class="user-message max-w-2xl px-5 py-4 text-gray-900 shadow-sm border border-blue-100"><p class="text-sm leading-relaxed">${text}</p></div></div>`;
+        }
+
+        function getAiMsgHtml(content) {
+             return `<div class="flex justify-start mb-6 mx-auto w-full max-w-5xl px-4">${content}</div>`;
+        }
+
+        // --- QUERY HANDLING LOGIC (For new user input) ---
+        function submitNLQuery(queryText) {
+            const queryBox = document.getElementById('nl-query-box');
+            let query = queryText;
+            if (!query && queryBox) { query = queryBox.value.trim(); queryBox.value = ''; }
+            if (!query) return;
+            const chatHistory = document.getElementById('chat-history');
+            if (!chatHistory) return;
+            
+            chatHistory.innerHTML += getUserMsgHtml(query);
+            
+            // Loading State
+            chatHistory.innerHTML += `<div id="ai-loading-bubble" class="flex justify-start mb-6 mx-auto w-full max-w-5xl px-4"><div class="ai-response max-w-md px-4 py-3 text-gray-600 shadow-md"><i data-lucide="loader-2" class="w-4 h-4 text-emerald-500 animate-spin inline mr-2"></i><span class="text-sm italic">Analyzing data...</span></div></div>`;
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+            lucide.createIcons();
+            
+            setTimeout(() => {
+                const loadingElement = document.getElementById('ai-loading-bubble');
+                if (loadingElement) loadingElement.remove();
+                
+                let content = '';
+                const lowerQuery = query.toLowerCase();
+
+                if (lowerQuery.includes('summarize') || lowerQuery.includes('summary')) {
+                    content = generateFileSummary();
+                } else if (lowerQuery.includes('report') && (lowerQuery.includes('3') || lowerQuery.includes('three') || lowerQuery.includes('files'))) {
+                    content = generateConsolidatedReport();
+                } else if (lowerQuery.includes('pie') && lowerQuery.includes('date')) {
+                    content = generateDateRangePieChart();
+                } else if (lowerQuery.includes('line') || lowerQuery.includes('trend')) {
+                    content = generateTrendLineChart();
+                } else if (lowerQuery.includes('table') && (lowerQuery.includes('range') || lowerQuery.includes('>'))) {
+                    content = generateRangeTable();
+                } else {
+                    content = `<div class="ai-response max-w-4xl w-full p-6 shadow-lg border border-gray-100">
+                        <div class="flex justify-between items-center mb-4 border-b border-gray-100 pb-3">
+                            <h2 class="text-lg font-bold text-gray-800">General Answer</h2>
+                        </div>
+                        <p class="text-gray-700 text-sm leading-relaxed">I can help with that. Try asking to "Summarize uploaded file" or "Show trend line chart from excel".</p>
+                        ${generateFeedbackActions()}
+                    </div>`;
+                }
+                
+                chatHistory.innerHTML += getAiMsgHtml(content);
+                chatHistory.scrollTop = chatHistory.scrollHeight;
+                lucide.createIcons();
+            }, 1500);
+        }
+
+        // --- RESPONSE GENERATORS ---
+
+        function generateFileSummary() {
+            const downloadButtons = `
+                <button onclick="simulateExport('Summary_Report.docx', 'Word Doc')" class="p-1.5 text-gray-600 hover:text-blue-600 bg-gray-50 hover:bg-blue-50 border border-gray-200 hover:border-blue-200 rounded transition flex items-center text-xs font-semibold px-3" title="Download Word Doc">
+                    <i data-lucide="file-text" class="w-3.5 h-3.5 mr-1.5"></i> DOCX
+                </button>
+                <button class="p-1.5 text-gray-600 hover:text-blue-600 bg-gray-50 hover:bg-blue-50 border border-gray-200 hover:border-blue-200 rounded transition flex items-center text-xs font-semibold px-3" title="Copy to Clipboard">
+                    <i data-lucide="copy" class="w-3.5 h-3.5 mr-1.5"></i> Copy
+                </button>
+            `;
+
+            return `<div class="ai-response max-w-4xl w-full p-6 shadow-lg border border-gray-100">
+                <div class="flex justify-between items-center mb-5 border-b border-gray-100 pb-3">
+                    <h2 class="text-lg font-bold text-gray-800 flex items-center"><i data-lucide="file-text" class="w-5 h-5 mr-2 text-orange-600"></i> Summary: Monthly_Sales_Report.pdf</h2>
+                </div>
+                <div class="space-y-4 text-gray-700 text-sm mb-3">
+                    <p class="font-medium"><strong>Executive Overview:</strong> October sales exceeded targets by 15%, primarily driven by the enterprise sector.</p>
+                    <ul class="list-disc list-inside space-y-2 text-xs bg-gray-50 p-4 rounded-lg border border-gray-200">
+                        <li><strong>Top Performer:</strong> Northeast Region ($1.2M revenue).</li>
+                        <li><strong>Key Risk:</strong> Supply chain delay mentioned on page 4 (3 week lag).</li>
+                        <li><strong>Action Item:</strong> Renew vendor contract by Nov 15th.</li>
+                    </ul>
+                </div>
+                <div class="flex items-center text-xs text-gray-500 bg-gray-50 p-2 rounded border border-gray-100">
+                    <i data-lucide="file" class="w-3 h-3 mr-2 text-emerald-600"></i>
+                    <span><strong>Source:</strong> Uploaded Context File</span>
+                </div>
+                ${generateResponseFooter(downloadButtons)}
+            </div>`;
+        }
+
+        function generateConsolidatedReport() {
+            const downloadButtons = `
+                <button onclick="simulateExport('Consolidated_Report_2025.docx', 'Word Doc')" class="p-1.5 text-gray-600 hover:text-blue-600 bg-gray-50 hover:bg-blue-50 border border-gray-200 hover:border-blue-200 rounded transition flex items-center text-xs font-semibold px-3" title="Download Word Doc">
+                    <i data-lucide="file-text" class="w-3.5 h-3.5 mr-1.5"></i> DOCX
+                </button>
+            `;
+
+            return `<div class="ai-response max-w-4xl w-full p-6 shadow-lg border border-gray-100">
+                <div class="flex justify-between items-center mb-5 border-b border-gray-100 pb-3">
+                    <h2 class="text-lg font-bold text-gray-800 flex items-center"><i data-lucide="clipboard-list" class="w-5 h-5 mr-2 text-purple-600"></i> Consolidated Q1-Q3 Performance Report</h2>
+                </div>
+                <div class="space-y-4 text-gray-700 text-sm">
+                    <div class="grid grid-cols-3 gap-4 mb-4">
+                        <div class="bg-blue-50 p-3 rounded-lg text-center">
+                            <p class="text-xs text-gray-500 uppercase">Q1 Revenue</p>
+                            <p class="text-lg font-bold text-blue-700">$2.4M</p>
+                            <p class="text-xs text-green-600">↑ 5% YoY</p>
+                        </div>
+                        <div class="bg-blue-50 p-3 rounded-lg text-center">
+                            <p class="text-xs text-gray-500 uppercase">Q2 Revenue</p>
+                            <p class="text-lg font-bold text-blue-700">$2.8M</p>
+                            <p class="text-xs text-green-600">↑ 12% YoY</p>
+                        </div>
+                        <div class="bg-blue-50 p-3 rounded-lg text-center">
+                            <p class="text-xs text-gray-500 uppercase">Q3 Revenue</p>
+                            <p class="text-lg font-bold text-blue-700">$3.1M</p>
+                            <p class="text-xs text-green-600">↑ 8% YoY</p>
+                        </div>
+                    </div>
+                    <p><strong>Synthesis:</strong> Consistent growth observed across all three quarters. Q2 showed the highest velocity due to the summer marketing campaign (referenced in Q2_Revenue.xlsx).</p>
+                </div>
+                <div class="flex items-center text-xs text-gray-500 bg-gray-50 p-2 rounded border border-gray-100 mt-4">
+                    <i data-lucide="files" class="w-3 h-3 mr-2 text-emerald-600"></i>
+                    <span><strong>Sources:</strong> Q1_Revenue.xlsx, Q2_Revenue.xlsx, Q3_Revenue.xlsx</span>
+                </div>
+                ${generateResponseFooter(downloadButtons)}
+            </div>`;
+        }
+
+        function generateDateRangePieChart() {
+            const downloadButtons = `
+                <button onclick="simulateExport('Revenue_Chart.docx', 'Word Report')" class="p-1.5 text-gray-600 hover:text-blue-600 bg-gray-50 hover:bg-blue-50 border border-gray-200 hover:border-blue-200 rounded transition flex items-center text-xs font-semibold px-3" title="Download Word Doc">
+                    <i data-lucide="file-text" class="w-3.5 h-3.5 mr-1.5"></i> DOCX
+                </button>
+            `;
+
+            return `<div class="ai-response max-w-4xl w-full p-6 shadow-lg border border-gray-100">
+                <div class="flex justify-between items-center mb-5 border-b border-gray-100 pb-3">
+                    <h2 class="text-lg font-bold text-gray-800 flex items-center"><i data-lucide="pie-chart" class="w-5 h-5 mr-2 text-pink-600"></i> Revenue Distribution (Jan 1 - Mar 31)</h2>
+                    <div class="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded border border-gray-200">
+                        <i data-lucide="calendar" class="w-3 h-3 inline mr-1"></i> <span>Range: Q1 2025</span>
+                    </div>
+                </div>
+                <div class="flex flex-col sm:flex-row items-center justify-center sm:justify-around mt-4 mb-6 gap-6">
+                    <div class="relative group cursor-pointer">
+                        <div class="w-48 h-48 rounded-full shadow-inner" style="background: conic-gradient(#ec4899 0% 45%, #8b5cf6 45% 75%, #f59e0b 75% 100%);"></div>
+                    </div>
+                    <div class="space-y-3">
+                        <div class="flex items-center"><span class="w-3 h-3 rounded-full bg-pink-500 mr-2"></span><span class="text-sm text-gray-600">Direct Sales (45%)</span></div>
+                        <div class="flex items-center"><span class="w-3 h-3 rounded-full bg-violet-500 mr-2"></span><span class="text-sm text-gray-600">Partner Channels (30%)</span></div>
+                        <div class="flex items-center"><span class="w-3 h-3 rounded-full bg-amber-500 mr-2"></span><span class="text-sm text-gray-600">Online Store (25%)</span></div>
+                    </div>
+                </div>
+                <div class="flex items-center text-xs text-gray-500 bg-gray-50 p-2 rounded border border-gray-100">
+                    <i data-lucide="filter" class="w-3 h-3 mr-2 text-emerald-600"></i>
+                    <span><strong>Filter Applied:</strong> Date >= 2025-01-01 AND Date <= 2025-03-31</span>
+                </div>
+                ${generateResponseFooter(downloadButtons)}
+            </div>`;
+        }
+
+        function generateTrendLineChart() {
+             const downloadButtons = `
+                <button onclick="simulateExport('Trend_Report.docx', 'Word Report')" class="p-1.5 text-gray-600 hover:text-blue-600 bg-gray-50 hover:bg-blue-50 border border-gray-200 hover:border-blue-200 rounded transition flex items-center text-xs font-semibold px-3" title="Download Word Doc">
+                    <i data-lucide="file-text" class="w-3.5 h-3.5 mr-1.5"></i> DOCX
+                </button>
+                <button onclick="simulateExport('Trend_Analysis.png', 'Image')" class="p-1.5 text-gray-600 hover:text-purple-600 bg-gray-50 hover:bg-purple-50 border border-gray-200 hover:border-purple-200 rounded transition flex items-center text-xs font-semibold px-3" title="Download Image">
+                    <i data-lucide="image" class="w-3.5 h-3.5 mr-1.5"></i> PNG
+                </button>
+            `;
+
+            return `<div class="ai-response max-w-4xl w-full p-6 shadow-lg border border-gray-100">
+                <div class="flex justify-between items-center mb-5 border-b border-gray-100 pb-3">
+                    <h2 class="text-lg font-bold text-gray-800 flex items-center"><i data-lucide="trending-up" class="w-5 h-5 mr-2 text-indigo-600"></i> Annual Sales Trend</h2>
+                </div>
+                <div class="relative h-64 w-full bg-white border-l border-b border-gray-200 mb-4 p-4 flex items-end justify-between px-8">
+                    <!-- Grid Lines -->
+                    <div class="absolute inset-0 border-t border-gray-100" style="top: 20%"></div>
+                    <div class="absolute inset-0 border-t border-gray-100" style="top: 40%"></div>
+                    <div class="absolute inset-0 border-t border-gray-100" style="top: 60%"></div>
+                    
+                    <!-- SVG Line -->
+                    <svg class="absolute inset-0 h-full w-full pointer-events-none" preserveAspectRatio="none">
+                        <polyline points="40,200 120,160 200,180 280,100 360,120 440,60 520,40" fill="none" stroke="#6366f1" stroke-width="3" style="animation: fadeUp 1s ease-out;"/>
+                        <circle cx="40" cy="200" r="4" fill="#6366f1" />
+                        <circle cx="120" cy="160" r="4" fill="#6366f1" />
+                        <circle cx="200" cy="180" r="4" fill="#6366f1" />
+                        <circle cx="280" cy="100" r="4" fill="#6366f1" />
+                        <circle cx="360" cy="120" r="4" fill="#6366f1" />
+                        <circle cx="440" cy="60" r="4" fill="#6366f1" />
+                        <circle cx="520" cy="40" r="4" fill="#6366f1" />
+                    </svg>
+                    
+                    <!-- X Axis Labels -->
+                    <span class="text-xs text-gray-400 absolute bottom-0 left-8">Jan</span>
+                    <span class="text-xs text-gray-400 absolute bottom-0 left-1/4">Mar</span>
+                    <span class="text-xs text-gray-400 absolute bottom-0 left-1/2">Jun</span>
+                    <span class="text-xs text-gray-400 absolute bottom-0 left-3/4">Sep</span>
+                    <span class="text-xs text-gray-400 absolute bottom-0 right-8">Dec</span>
+                </div>
+                <div class="p-3 bg-indigo-50 border border-indigo-100 rounded-lg text-sm text-indigo-800">
+                    <strong>Trend Analysis:</strong> Strong upward trajectory in Q4. Dip in Q2 correlated with inventory shortage.
+                </div>
+                <div class="flex items-center text-xs text-gray-500 bg-gray-50 p-2 rounded border border-gray-100 mt-2">
+                    <i data-lucide="file-spreadsheet" class="w-3 h-3 mr-2 text-emerald-600"></i>
+                    <span><strong>Source Data:</strong> Global_Sales_Trends.xlsx</span>
+                </div>
+                ${generateResponseFooter(downloadButtons)}
+            </div>`;
+        }
+
+        function generateRangeTable() {
+             const downloadButtons = `
+                <button onclick="simulateExport('Inventory_Report.docx', 'Word Doc')" class="p-1.5 text-gray-600 hover:text-blue-600 bg-gray-50 hover:bg-blue-50 border border-gray-200 hover:border-blue-200 rounded transition flex items-center text-xs font-semibold px-3" title="Download Word Doc">
+                    <i data-lucide="file-text" class="w-3.5 h-3.5 mr-1.5"></i> DOCX
+                </button>
+                <button onclick="simulateExport('Filtered_Inventory.csv', 'CSV')" class="p-1.5 text-gray-600 hover:text-green-600 bg-gray-50 hover:bg-green-50 border border-gray-200 hover:border-green-200 rounded transition flex items-center text-xs font-semibold px-3" title="Download CSV">
+                    <i data-lucide="sheet" class="w-3.5 h-3.5 mr-1.5"></i> CSV
+                </button>
+            `;
+
+            return `<div class="ai-response max-w-4xl w-full p-6 shadow-lg border border-gray-100">
+                <div class="flex justify-between items-center mb-5 border-b border-gray-100 pb-3">
+                    <h2 class="text-lg font-bold text-gray-800 flex items-center"><i data-lucide="table" class="w-5 h-5 mr-2 text-emerald-600"></i> Inventory Items (Value > $5,000)</h2>
+                </div>
+                <div class="overflow-x-auto mb-3">
+                    <table class="min-w-full divide-y divide-gray-200 border border-gray-100 rounded-lg">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Item Name</th>
+                                <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Category</th>
+                                <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Stock</th>
+                                <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Unit Value</th>
+                                <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Total Value</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            <tr><td class="px-4 py-3 text-sm font-medium text-gray-900">Server Rack Unit X1</td><td class="px-4 py-3 text-sm text-gray-500">IT Infra</td><td class="px-4 py-3 text-sm text-gray-500">4</td><td class="px-4 py-3 text-sm text-gray-500">$2,500</td><td class="px-4 py-3 text-sm font-bold text-emerald-600">$10,000</td></tr>
+                            <tr><td class="px-4 py-3 text-sm font-medium text-gray-900">Industrial Printer</td><td class="px-4 py-3 text-sm text-gray-500">Equipment</td><td class="px-4 py-3 text-sm text-gray-500">2</td><td class="px-4 py-3 text-sm text-gray-500">$3,200</td><td class="px-4 py-3 text-sm font-bold text-emerald-600">$6,400</td></tr>
+                            <tr><td class="px-4 py-3 text-sm font-medium text-gray-900">High-End Workstation</td><td class="px-4 py-3 text-sm text-gray-500">Computers</td><td class="px-4 py-3 text-sm text-gray-500">5</td><td class="px-4 py-3 text-sm text-gray-500">$1,800</td><td class="px-4 py-3 text-sm font-bold text-emerald-600">$9,000</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="flex items-center text-xs text-gray-500 bg-gray-50 p-2 rounded border border-gray-100">
+                    <i data-lucide="filter" class="w-3 h-3 mr-2 text-emerald-600"></i>
+                    <span><strong>Filter Logic:</strong> WHERE total_value > 5000</span>
+                </div>
+                ${generateResponseFooter(downloadButtons)}
+            </div>`;
+        }
+
+        function generateResponseFooter(downloadButtonsHtml) {
+            return `
+            <div class="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
+                <div class="flex space-x-2">
+                    ${downloadButtonsHtml}
+                </div>
+                <div class="text-xs text-gray-400 italic">DocuMind AI generated content</div>
+            </div>`;
+        }
+
+        function generateFeedbackActions() {
+             return `<div class="mt-4 text-xs text-gray-400 italic text-right">DocuMind AI generated content</div>`;
+        }
+
+        function showSearchMode(mode) {
+            currentSearchMode = mode;
+            const contentDiv = document.getElementById('search-mode-content');
+            if (!contentDiv) return;
+            contentDiv.innerHTML = generateNaturalLanguageChatInterface();
+            setupChatDragAndDrop();
+            const history = document.getElementById('chat-history');
+            
+            // Populates the chat with ALL 5 mock examples immediately
+            if (history) {
+                 renderMockConversation(history);
+            }
+            lucide.createIcons();
+        }
+
+        function generateSearchContent() {
+             // Removed header logo/user info from here
+            return `<div class="h-full flex flex-col pt-0">
+                    <div id="search-mode-content" class="flex-1 min-h-0"></div>
+                </div>`;
+        }
+
+        // --- UPLOAD MODULE ---
+        function generateFileTreeHtml(files, level = 0) {
+            return `<ul class="file-tree-ul ${level > 0 ? 'file-children hidden' : ''}">${files.map(item => {
+                const isFolder = item.type === 'folder';
+                const folderIcon = isFolder ? 'folder' : (item.name.endsWith('.xlsx') ? 'file-spreadsheet' : (item.name.endsWith('.pdf') ? 'file-text' : 'file'));
+                let iconColor = isFolder ? 'text-blue-500' : 'text-gray-500';
+                let textColor = 'text-gray-900';
+                if (item.isChatFolder) { iconColor = 'text-emerald-500'; textColor = 'text-emerald-700 font-semibold'; }
+                const statusBadge = getStatusBadge(item.status);
+                const hasChildren = isFolder && item.children && item.children.length > 0;
+                const indentStyle = `padding-left: ${level * 25}px;`;
+                
+                // Updated Action Buttons Area
+                let actionButtonsHtml = '';
+                if (isFolder) {
+                    actionButtonsHtml = `
+                        <div class="flex items-center justify-center space-x-1">
+                            <button class="add-subfolder-btn p-1 text-gray-400 hover:text-blue-600 transition" data-folder-name="${item.name}" onclick="createFolder('${item.name}', event)" title="Create Subfolder">
+                                <i data-lucide="folder-plus" class="w-5 h-5"></i>
+                            </button>
+                            <button class="chat-folder-btn p-1 text-gray-400 hover:text-emerald-600 transition" data-folder-name="${item.name}" onclick="openFolderChat('${item.name}', event)" title="Chat with Folder">
+                                <i data-lucide="message-square" class="w-5 h-5"></i>
+                            </button>
+                        </div>
+                    `;
+                }
+
+                return `<li class="border-b border-gray-100 last:border-b-0"><div class="file-item ${isFolder?'is-folder cursor-pointer':''}" data-is-folder="${isFolder}" data-folder-name="${isFolder?item.name:''}" draggable="${!isFolder}" style="${indentStyle}"><div class="flex items-center text-sm font-medium ${textColor} overflow-hidden pr-2"><i data-lucide="${hasChildren?'chevron-right':''}" class="toggle-icon w-4 h-4 mr-1 text-gray-400 ${!hasChildren?'opacity-0':''} transition-transform duration-200"></i><i data-lucide="${folderIcon}" class="w-5 h-5 mr-3 ${iconColor}"></i><span class="truncate">${item.name}</span></div><div class="text-sm text-gray-500 capitalize">${isFolder?'Folder':(item.name.endsWith('.pdf')?'PDF':'File')}</div><div class="text-sm text-gray-500">${item.date}</div><div class="text-sm text-gray-500">${statusBadge}</div><div class="flex justify-center items-center">${actionButtonsHtml}</div></div>${hasChildren ? generateFileTreeHtml(item.children, level + 1) : ''}</li>`;
+            }).join('')}</ul>`;
+        }
+        function getStatusBadge(status) {
+            if (status === 'Indexed') return `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Indexed</span>`;
+            if (status === 'Processing') return `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800 flex items-center"><i data-lucide="loader-2" class="w-3 h-3 mr-1 animate-spin"></i> Processing</span>`;
+            return `<span class="text-sm text-gray-600">${status}</span>`;
+        }
+        function initializeFileTreeLogic() {
+            const container = document.getElementById('file-list-container');
+            if (!container) return;
+            container.querySelectorAll('.file-item.is-folder').forEach(folderItem => {
+                folderItem.addEventListener('click', (e) => {
+                    // Prevent toggle if clicking action buttons
+                    if (e.target.closest('.chat-folder-btn') || e.target.closest('.add-subfolder-btn')) return;
+                    
+                    const parentLi = folderItem.closest('li');
+                    if (!parentLi) return;
+                    const childrenUl = parentLi.querySelector('.file-children');
+                    if (childrenUl) { childrenUl.classList.toggle('hidden'); const icon = folderItem.querySelector('.toggle-icon'); if (icon) icon.classList.toggle('rotate-90'); }
+                });
+            });
+            container.addEventListener('dragover', (e) => e.preventDefault());
+            container.addEventListener('dragenter', (e) => e.preventDefault());
+            container.querySelectorAll('[data-is-folder="true"]').forEach(folderItem => {
+                folderItem.addEventListener('dragenter', (e) => { e.preventDefault(); e.currentTarget.classList.add('drag-over'); });
+                folderItem.addEventListener('dragleave', (e) => { setTimeout(() => { const target = document.elementFromPoint(e.clientX, e.clientY); if (target && !target.closest('.file-item.is-folder.drag-over')) e.currentTarget.classList.remove('drag-over'); }, 0); });
+                folderItem.addEventListener('dragover', (e) => e.preventDefault());
+                folderItem.addEventListener('drop', (e) => {
+                    e.preventDefault(); e.currentTarget.classList.remove('drag-over');
+                    const folderName = e.currentTarget.dataset.folderName; 
+                    const toastContainer = document.getElementById('toast-container');
+                    if (toastContainer) { toastContainer.innerHTML = `<div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative soft-shadow mb-4" role="alert"><span class="block sm:inline">Mock upload successful! File dropped into <strong>${folderName}</strong>.</span></div>`; setTimeout(() => toastContainer.innerHTML = '', 3000); }
+                });
+            });
+        }
+        function simulateUpload() { const t = document.getElementById('toast-container'); if (t) { t.innerHTML = `<div class="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded relative soft-shadow mb-4">Starting new file upload...</div>`; setTimeout(() => t.innerHTML = '', 3000); } }
+        
+        // NEW Create Folder Logic (Updated for Subfolders)
+        function createFolder(preSelectedParentName = null, event = null) {
+            if (event) event.stopPropagation();
+            
+            const modal = document.getElementById('create-folder-modal');
+            const select = document.getElementById('new-folder-location');
+            const nameInput = document.getElementById('new-folder-name');
+            
+            if (modal && select && nameInput) {
+                // Reset input
+                nameInput.value = '';
+                
+                // Populate locations
+                select.innerHTML = '<option value="root">My DocuMind Files (Root)</option>';
+                const addOptions = (items, level = 0) => {
+                    items.forEach(item => {
+                        if (item.type === 'folder') {
+                            const indent = '&nbsp;'.repeat(level * 4);
+                            select.innerHTML += `<option value="${item.name}">${indent}📂 ${item.name}</option>`;
+                            if (item.children) {
+                                addOptions(item.children, level + 1);
+                            }
+                        }
+                    });
+                };
+                addOptions(mockFileStructure);
+                
+                // Set value if triggered from specific folder
+                // IMPORTANT FIX: Check type to ensure it's a string, not an Event object
+                if (preSelectedParentName && typeof preSelectedParentName === 'string') {
+                    select.value = preSelectedParentName;
+                } else {
+                    select.value = 'root';
+                }
+                
+                modal.classList.remove('hidden');
+            }
+        }
+
+        function closeCreateFolderModal() {
+            const modal = document.getElementById('create-folder-modal');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        function submitCreateFolder() {
+            const nameInput = document.getElementById('new-folder-name');
+            const select = document.getElementById('new-folder-location');
+            const folderName = nameInput.value.trim();
+            const locationName = select.value;
+
+            if (!folderName) {
+                showToast("Please enter a folder name", 'info');
+                return;
+            }
+
+            const newFolder = {
+                name: folderName,
+                type: "folder",
+                date: "Just now",
+                status: "0 files",
+                children: []
+            };
+
+            if (locationName === 'root') {
+                mockFileStructure.push(newFolder);
+            } else {
+                // Find parent and add
+                const findAndAdd = (items) => {
+                    for (let item of items) {
+                        if (item.type === 'folder') {
+                            if (item.name === locationName) {
+                                if (!item.children) item.children = [];
+                                item.children.unshift(newFolder); // Add to top of children
+                                return true;
+                            }
+                            if (item.children && findAndAdd(item.children)) return true;
+                        }
+                    }
+                    return false;
+                };
+                findAndAdd(mockFileStructure);
+            }
+
+            // Refresh UI
+            const listContainer = document.getElementById('file-list-container');
+            if (listContainer) {
+               listContainer.innerHTML = `<div class="file-tree"><div class="file-item bg-gray-50 text-xs font-medium text-gray-500 uppercase tracking-wider sticky top-0 z-10"><div>Name</div><div>Type/Size</div><div>Last Modified</div><div>Extraction Status</div><div>Actions</div></div>${generateFileTreeHtml(mockFileStructure)}</div>`;
+               initializeFileTreeLogic(); // Re-bind events
+               lucide.createIcons();
+            }
+
+            closeCreateFolderModal();
+            showToast(`Folder "${folderName}" created in ${locationName === 'root' ? 'Root' : locationName}!`);
+        }
+
+        // --- AUTH FUNCTIONS ---
+        function logoutUser() {
+            showToast("Logging out...", "info");
+            setTimeout(() => {
+                // Simulate redirect or reload
+                window.location.reload();
+            }, 1500);
+        }
+
+        function generateStatsBar() { return `<div class="grid grid-cols-4 gap-4 mb-8"><div class="bg-white p-5 rounded-xl soft-shadow border border-gray-100 flex items-center justify-between"><div><p class="text-sm font-medium text-gray-500">Total Uploaded</p><p class="text-3xl font-bold text-gray-900 mt-1">1,450</p></div><i data-lucide="file-text" class="w-10 h-10 text-emerald-400 opacity-60"></i></div><div class="bg-white p-5 rounded-xl soft-shadow border border-gray-100 flex items-center justify-between"><div><p class="text-sm font-medium text-gray-500">Indexed (Queryable)</p><p class="text-3xl font-bold text-gray-900 mt-1">1,390</p></div><i data-lucide="search-check" class="w-10 h-10 text-cyan-400 opacity-60"></i></div><div class="bg-white p-5 rounded-xl soft-shadow border border-gray-100 flex items-center justify-between"><div><p class="text-sm font-medium text-gray-500">Total Folders</p><p class="text-3xl font-bold text-gray-900 mt-1">45</p></div><i data-lucide="folder" class="w-10 h-10 text-blue-400 opacity-60"></i></div><div class="bg-white p-5 rounded-xl soft-shadow border border-gray-100 flex items-center justify-between"><div><p class="text-sm font-medium text-gray-500">Processing Queue</p><p class="text-3xl font-bold text-gray-900 mt-1 text-yellow-600">6</p></div><i data-lucide="loader-2" class="w-10 h-10 text-yellow-400 opacity-60 animate-spin-slow"></i></div></div>`; }
+        function generateUploadContent() {
+             // Removed header Logo/User info for vertical space
+            return `<div class="h-full flex flex-col pt-0"><div class="flex justify-between items-center mb-6 pt-4"><h2 class="text-xl font-medium text-gray-600">File Organizer & Processing Status</h2></div>${generateStatsBar()}<div class="flex flex-1 min-h-0 space-x-6"><div class="w-1/4 max-w-xs flex flex-col"><button id="new-upload-btn" class="w-full py-4 bg-emerald-500 text-white font-bold rounded-xl hover:bg-emerald-600 transition duration-150 soft-shadow mb-6 flex items-center justify-center"><i data-lucide="plus-circle" class="w-5 h-5 mr-2"></i> New Upload</button><div class="bg-white p-4 rounded-xl soft-shadow space-y-2 text-gray-700"><div class="flex items-center p-2 rounded-lg hover:bg-gray-50 cursor-pointer text-emerald-600 font-medium"><i data-lucide="files" class="w-5 h-5 mr-3"></i> My Files</div><div class="flex items-center p-2 rounded-lg hover:bg-gray-50 cursor-pointer"><i data-lucide="clock" class="w-5 h-5 mr-3"></i> Recent</div><div class="flex items-center p-2 rounded-lg hover:bg-gray-50 cursor-pointer"><i data-lucide="zap" class="w-5 h-5 mr-3"></i> Processing Queue</div><div class="flex items-center p-2 rounded-lg hover:bg-gray-50 cursor-pointer"><i data-lucide="trash-2" class="w-5 h-5 mr-3"></i> Trash</div><div class="pt-4 border-t border-gray-100"><p class="text-sm font-medium mb-2">Storage</p><div class="w-full bg-gray-200 rounded-full h-2.5"><div class="bg-emerald-500 h-2.5 rounded-full" style="width: 45%"></div></div><p class="text-xs text-gray-500 mt-1">2.25 GB of 5 GB used</p></div></div></div><div class="flex-1 bg-white p-6 rounded-2xl soft-shadow border border-gray-100 min-h-0 flex flex-col"><div id="toast-container" class="sticky top-0 z-20"></div><div class="flex justify-between items-center mb-4 border-b pb-4"><h3 class="text-xl font-semibold text-gray-800 flex items-center"><i data-lucide="folder-open" class="w-6 h-6 mr-3 text-gray-500"></i> My DocuMind Files</h3><div class="flex items-center space-x-3"><button id="new-folder-btn-header" class="p-2 text-blue-500 hover:bg-gray-100 rounded-lg transition duration-150" title="Create New Folder"><i data-lucide="folder-plus" class="w-5 h-5"></i></button><input type="text" placeholder="Search files..." class="p-2 border border-gray-300 rounded-lg text-sm w-48 focus:ring-emerald-500 focus:border-emerald-500"><button class="p-2 text-gray-600 hover:bg-gray-100 rounded-lg" title="View Options"><i data-lucide="layout-grid" class="w-5 h-5"></i></button></div></div><div class="flex-1 min-h-0 overflow-y-auto" id="file-list-container"><div class="file-tree"><div class="file-item bg-gray-50 text-xs font-medium text-gray-500 uppercase tracking-wider sticky top-0 z-10"><div>Name</div><div>Type/Size</div><div>Last Modified</div><div>Extraction Status</div><div>Actions</div></div>${generateFileTreeHtml(mockFileStructure)}</div></div></div></div></div>`;
+        }
+
+        // --- FOLDER CHAT FUNCTIONS (Newly Added) ---
+        function openFolderChat(folderName, event) {
+            if (event) event.stopPropagation();
+            const modal = document.getElementById('folder-chat-modal');
+            const title = document.getElementById('folder-chat-title');
+            const body = document.getElementById('folder-chat-body');
+            
+            if (modal && title && body) {
+                title.innerHTML = `Chat with <span class="text-emerald-600 ml-1">${folderName}</span>`;
+                // Clear previous chat
+                body.innerHTML = `
+                    <div class="flex justify-start">
+                        <div class="bg-gray-100 rounded-lg rounded-tl-none p-3 max-w-[80%] text-sm text-gray-700">
+                            Hello! I've analyzed the files in <strong>${folderName}</strong>. What would you like to know?
+                        </div>
+                    </div>`;
+                modal.classList.remove('hidden');
+                
+                // Reset input
+                const input = document.getElementById('folder-chat-input');
+                if (input) input.value = '';
+            }
+        }
+
+        function closeFolderChat() {
+            const modal = document.getElementById('folder-chat-modal');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        window.onload = () => {
+            lucide.createIcons();
+            // Restricted nav event listeners
+            ['search', 'upload', 'history'].forEach(id => {
+                const el = document.getElementById('nav-' + id);
+                if (el) el.addEventListener('click', (e) => { e.preventDefault(); navigateTo(id); });
+            });
+            navigateTo('search');
+
+            // Setup Folder Chat Listeners
+            const sendBtn = document.getElementById('folder-chat-send');
+            const input = document.getElementById('folder-chat-input');
+            const body = document.getElementById('folder-chat-body');
+
+            if (sendBtn && input && body) {
+                const sendMsg = () => {
+                    const txt = input.value.trim();
+                    if (!txt) return;
+                    
+                    // User Msg
+                    body.innerHTML += `
+                        <div class="flex justify-end mt-4">
+                            <div class="bg-emerald-100 text-emerald-900 rounded-lg rounded-tr-none p-3 max-w-[80%] text-sm">
+                                ${txt}
+                            </div>
+                        </div>`;
+                    input.value = '';
+                    body.scrollTop = body.scrollHeight;
+
+                    // Fake AI Response
+                    setTimeout(() => {
+                        body.innerHTML += `
+                            <div class="flex justify-start mt-4">
+                                <div class="bg-gray-100 rounded-lg rounded-tl-none p-3 max-w-[80%] text-sm text-gray-700">
+                                    <i data-lucide="sparkles" class="w-3 h-3 inline mr-1 text-emerald-500"></i>
+                                    Here is a summary based on the documents in this folder... (Mock Response)
+                                </div>
+                            </div>`;
+                        body.scrollTop = body.scrollHeight;
+                        lucide.createIcons();
+                    }, 1000);
+                };
+
+                sendBtn.addEventListener('click', sendMsg);
+                input.addEventListener('keydown', (e) => { 
+                    if(e.key === 'Enter' && !e.shiftKey) { 
+                        e.preventDefault(); 
+                        sendMsg(); 
+                    } 
+                });
+            }
+        };
+    </script>
+</head>
+<body class="font-sans antialiased text-gray-900 min-h-screen overflow-x-hidden">
+
+    <!-- Modal for Folder Chat (Allowed for Users) -->
+    <div id="folder-chat-modal" class="modal-overlay hidden">
+        <div class="modal-content soft-shadow">
+            <div class="p-4 flex justify-between items-center border-b border-gray-100 rounded-t-xl"><h3 id="folder-chat-title" class="text-lg font-semibold text-gray-800 flex items-center">Chat with Folder</h3><button onclick="closeFolderChat()" class="p-1 rounded-full text-gray-500 hover:bg-gray-100"><i data-lucide="x" class="w-5 h-5"></i></button></div>
+            <div id="folder-chat-body" class="flex-1 p-4 overflow-y-auto space-y-4"></div>
+            <div class="p-4 border-t border-gray-100 rounded-b-xl"><div class="relative flex items-center"><textarea id="folder-chat-input" placeholder="Ask about documents..." class="w-full p-3 pr-12 border border-gray-300 rounded-xl resize-none h-14"></textarea><button id="folder-chat-send" class="absolute right-2 top-2 py-2 px-3 bg-emerald-500 text-white font-semibold rounded-lg hover:bg-emerald-600"><i data-lucide="send" class="w-5 h-5"></i></button></div></div>
+        </div>
+    </div>
+
+    <!-- Modal for Create Folder -->
+    <div id="create-folder-modal" class="modal-overlay hidden">
+        <div class="modal-content soft-shadow h-auto max-h-[500px]">
+            <div class="p-4 flex justify-between items-center border-b border-gray-100 rounded-t-xl">
+                <h3 class="text-lg font-semibold text-gray-800">Create New Folder</h3>
+                <button onclick="closeCreateFolderModal()" class="p-1 rounded-full text-gray-500 hover:bg-gray-100"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Folder Name</label>
+                    <input type="text" id="new-folder-name" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500" placeholder="e.g., Q4 Reports">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                    <select id="new-folder-location" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500">
+                        <option value="root">My DocuMind Files (Root)</option>
+                        <!-- Dynamic options will go here -->
+                    </select>
+                </div>
+            </div>
+            <div class="p-4 border-t border-gray-100 rounded-b-xl flex justify-end space-x-3">
+                <button onclick="closeCreateFolderModal()" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition">Cancel</button>
+                <button onclick="submitCreateFolder()" class="px-4 py-2 bg-emerald-500 text-white font-semibold rounded-lg hover:bg-emerald-600 transition">Create Folder</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Layout -->
+    <div class="flex h-screen overflow-hidden">
+        <div id="sidebar" class="bg-white w-20 p-5 flex flex-col justify-between fixed top-0 left-0 h-full soft-shadow transition-all duration-300 z-50 border-r border-gray-100">
+            <!-- Sidebar Content Wrapper -->
+            <div class="flex flex-col h-full justify-between w-full">
+                <!-- Top Section: Logo & Nav -->
+                <div class="flex flex-col items-center w-full">
+                    <!-- Logo Icon Only -->
+                    <div class="mb-8 p-2 bg-emerald-50 rounded-xl">
+                        <i data-lucide="sparkles" class="w-6 h-6 text-emerald-600"></i>
+                    </div>
+
+                    <!-- Reduced Nav -->
+                    <nav class="space-y-4 w-full flex flex-col items-center">
+                        <a href="#" id="nav-search" class="nav-active relative flex items-center justify-center p-3 rounded-xl text-gray-900 transition-all duration-200 group w-12 h-12">
+                            <i data-lucide="search" class="w-6 h-6 text-emerald-500 group-hover:text-emerald-600"></i>
+                            <span class="absolute left-full ml-4 bg-gray-900 text-white text-xs font-medium px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 shadow-lg pointer-events-none whitespace-nowrap z-50">Search & Query</span>
+                        </a>
+                        <a href="#" id="nav-history" class="relative flex items-center justify-center p-3 rounded-xl text-gray-500 hover:bg-gray-50 transition-all duration-200 group w-12 h-12">
+                            <i data-lucide="history" class="w-6 h-6 text-emerald-500 group-hover:text-emerald-600"></i>
+                            <span class="absolute left-full ml-4 bg-gray-900 text-white text-xs font-medium px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 shadow-lg pointer-events-none whitespace-nowrap z-50">Session History</span>
+                        </a>
+                        <a href="#" id="nav-upload" class="relative flex items-center justify-center p-3 rounded-xl text-gray-500 hover:bg-gray-50 transition-all duration-200 group w-12 h-12">
+                            <i data-lucide="upload-cloud" class="w-6 h-6 text-emerald-500 group-hover:text-emerald-600"></i>
+                            <span class="absolute left-full ml-4 bg-gray-900 text-white text-xs font-medium px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 shadow-lg pointer-events-none whitespace-nowrap z-50">Upload & Queue</span>
+                        </a>
+                    </nav>
+                </div>
+
+                <!-- Bottom Section: User Profile (Initials) -->
+                <div class="flex justify-center w-full mb-2">
+                    <div class="relative group cursor-pointer">
+                        <div class="w-10 h-10 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-sm border-2 border-white shadow-sm hover:ring-2 hover:ring-emerald-200 transition">
+                            BN
+                        </div>
+                         <!-- Hover Detail Card (Updated for Interactivity) -->
+                        <div class="absolute left-full bottom-0 ml-4 mb-0 bg-white p-4 rounded-xl shadow-xl border border-gray-100 w-64 invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all duration-200 z-50">
+                            <div class="flex items-center mb-3">
+                                <div class="w-10 h-10 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-sm mr-3">BN</div>
+                                <div>
+                                    <p class="text-sm font-bold text-gray-900">Babirye Nakato</p>
+                                    <p class="text-xs text-gray-500">Standard User</p>
+                                </div>
+                            </div>
+                            <div class="pt-3 border-t border-gray-100">
+                                <p class="text-xs text-gray-400 flex justify-between"><span>Status:</span> <span class="text-emerald-500 font-medium">Active</span></p>
+                                <p class="text-xs text-gray-400 flex justify-between mt-1"><span>Last Login:</span> <span>Just now</span></p>
+                            </div>
+                            <!-- Logout Button -->
+                            <div class="pt-3 mt-3 border-t border-gray-100">
+                                <button onclick="logoutUser()" class="w-full py-2 flex items-center justify-center text-xs font-medium text-red-600 hover:bg-red-50 rounded-lg transition">
+                                    <i data-lucide="log-out" class="w-3.5 h-3.5 mr-2"></i> Log Out
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <main class="flex-1 ml-20 p-6 md:p-10 overflow-y-auto transition-all duration-300 main-content-bg">
+            <div id="main-content-container" class="h-full"></div>
+        </main>
+    </div>
+</body>
+</html>
