@@ -1,0 +1,13 @@
+# GitRepository source - tells Flux where to find your manifests
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: gitops-webapp
+  namespace: flux-system
+spec:
+  interval: 1m                    # How often to check for changes
+  url: https://github.com/YOUR_GITHUB_USERNAME/YOUR_REPO_NAME
+  ref:
+    branch: main
+  secretRef:
+    name: github-credentials      # Optional: for private repos

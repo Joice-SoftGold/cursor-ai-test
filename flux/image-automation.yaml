@@ -1,0 +1,31 @@
+# Optional: Image Repository - monitors ACR for new images
+# Use this if you want Flux to automatically detect new images
+# instead of GitHub Actions updating the manifests
+---
+apiVersion: image.toolkit.fluxcd.io/v1beta2
+kind: ImageRepository
+metadata:
+  name: gitops-webapp
+  namespace: flux-system
+spec:
+  image: YOUR_ACR_NAME.azurecr.io/gitops-webapp
+  interval: 1m
+  secretRef:
+    name: acr-credentials
+
+---
+# Image Policy - defines which tags to track
+apiVersion: image.toolkit.fluxcd.io/v1beta2
+kind: ImagePolicy
+metadata:
+  name: gitops-webapp
+  namespace: flux-system
+spec:
+  imageRepositoryRef:
+    name: gitops-webapp
+  policy:
+    semver:
+      range: ">=1.0.0"
+    # Or use alphabetical for timestamp-based tags:
+    # alphabetical:
+    #   order: desc
