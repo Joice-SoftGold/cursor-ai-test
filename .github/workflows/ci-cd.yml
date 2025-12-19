@@ -1,0 +1,102 @@
+# CI/CD Pipeline - Build, Push to ACR, and Update Kubernetes Manifests
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'app/**'
+      - 'Dockerfile'
+      - 'nginx.conf'
+  workflow_dispatch:  # Allow manual trigger
+
+env:
+  ACR_NAME: ${{ vars.ACR_NAME }}                    # Azure Container Registry name
+  IMAGE_NAME: gitops-webapp
+  RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+
+jobs:
+  build-and-push:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.meta.outputs.version }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Generate image metadata
+        id: meta
+        run: |
+          # Create unique tag using short SHA and timestamp
+          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+          TIMESTAMP=$(date +%Y%m%d%H%M%S)
+          VERSION="${SHORT_SHA}-${TIMESTAMP}"
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Generated version: ${VERSION}"
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Login to Azure Container Registry
+        run: |
+          az acr login --name ${{ env.ACR_NAME }}
+
+      - name: Build and Push Docker image
+        run: |
+          IMAGE_FULL="${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}"
+          
+          # Build the image
+          docker build -t ${IMAGE_FULL}:${{ steps.meta.outputs.version }} .
+          docker tag ${IMAGE_FULL}:${{ steps.meta.outputs.version }} ${IMAGE_FULL}:latest
+          
+          # Push both tags
+          docker push ${IMAGE_FULL}:${{ steps.meta.outputs.version }}
+          docker push ${IMAGE_FULL}:latest
+          
+          echo "✅ Pushed image: ${IMAGE_FULL}:${{ steps.meta.outputs.version }}"
+
+  update-manifests:
+    name: Update Kubernetes Manifests
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update Kubernetes deployment manifest
+        run: |
+          NEW_IMAGE="${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ needs.build-and-push.outputs.image_tag }}"
+          
+          # Update the image tag in the deployment manifest
+          sed -i "s|image:.*${{ env.IMAGE_NAME }}.*|image: ${NEW_IMAGE}|g" k8s/base/deployment.yaml
+          
+          echo "✅ Updated deployment.yaml with image: ${NEW_IMAGE}"
+          cat k8s/base/deployment.yaml
+
+      - name: Commit and push changes
+        run: |
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions@github.com"
+          
+          git add k8s/base/deployment.yaml
+          
+          # Only commit if there are changes
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore: update image to ${{ needs.build-and-push.outputs.image_tag }}
+            
+            Automated update from CI/CD pipeline
+            Commit: ${{ github.sha }}"
+            
+            git push
+            echo "✅ Pushed manifest update to repository"
+          fi
